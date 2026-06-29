@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -78,9 +79,10 @@ def remove_existing_partitions(dataset: str, months: list[tuple[int, int]], appl
         return removed
     for year, month in months:
         path = partition_file(dataset, year, month)
-        if path.exists():
-            path.unlink()
-            removed.append(str(path))
+        partition_dir = path.parent
+        if partition_dir.exists():
+            shutil.rmtree(partition_dir)
+            removed.append(str(partition_dir))
     return removed
 
 
@@ -164,7 +166,7 @@ def main() -> int:
             "fuelinst": ["periodStartUTC", "fuelType"],
             "fuelhh": ["time", "technology"],
             "prices": ["periodStartUTC"],
-            "method": "full touched month partitions are re-fetched, deduped and rewritten fresh",
+            "method": "full touched month partition directories are removed, re-fetched, deduped and rewritten fresh",
         },
         "removedPartitionsBeforeRewrite": removed,
         "results": results,
