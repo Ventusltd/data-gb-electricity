@@ -1,13 +1,13 @@
 {
-  "package_name": "data-gb-electricity-parquet-port.zip",
-  "package_sha256": "90f0df3fdcc266c6918a060876beca34503770f61fc9ba5c2d138b32354ffdff",
-  "verified_utc": "2026-06-29T10:10:00+00:00",
-  "file_count": 322,
+  "package_name": "data-gb-electricity-parquet-port(1).zip",
+  "package_sha256": "1bd9d06600cd7d8266f1d8f890d057f4fedb04dc2193cd8b42152bba23000f24",
+  "verified_utc": "2026-06-29T10:56:00+00:00",
+  "file_count": 323,
   "parquet_file_count": 319,
   "extensions": {
     ".parquet": 319,
     ".py": 1,
-    ".md": 1,
+    ".md": 2,
     ".json": 1
   },
   "contains_raw_csv": false,
