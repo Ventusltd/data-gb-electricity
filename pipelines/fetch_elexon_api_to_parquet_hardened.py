@@ -206,10 +206,22 @@ def key_for(dataset: str, row: dict[str, Any]) -> tuple[str, str]:
     raise ValueError(dataset)
 
 
+def read_parquet_file(path: Path) -> pa.Table:
+    """Read one physical Parquet file without Hive-partition column inference.
+
+    The generation tree uses a directory named dataset=fuelinst and the files also
+    contain a normal column named dataset. pyarrow.parquet.read_table may infer the
+    directory value as a dictionary partition column and then conflict with the
+    in-file string column. ParquetFile reads the file footer directly and avoids
+    merging directory partition columns into the table schema.
+    """
+    return pq.ParquetFile(path).read()
+
+
 def read_existing(dataset: str, path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
-    table = pq.read_table(path)
+    table = read_parquet_file(path)
     fields = [field.name for field in SCHEMAS[dataset]]
     return [{field: row.get(field) for field in fields} for row in table.to_pylist()]
 
@@ -276,7 +288,7 @@ def write_records(dataset: str, records: list[dict[str, Any]], apply: bool) -> d
             table = pa.Table.from_pylist(final_rows, schema=SCHEMAS[dataset])
             validate_table_schema(dataset, table, f"{year}-{month:02d} pre-write")
             pq.write_table(table, path, compression="zstd")
-            written = pq.read_table(path)
+            written = read_parquet_file(path)
             validate_table_schema(dataset, written, f"{year}-{month:02d} readback")
             readback_rows = [{field.name: row.get(field.name) for field in SCHEMAS[dataset]} for row in written.to_pylist()]
             item["readbackValidation"] = validate_rows(dataset, readback_rows, f"{year}-{month:02d} readback")
