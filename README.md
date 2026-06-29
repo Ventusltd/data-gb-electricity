@@ -6,168 +6,199 @@ This repository holds Great Britain electricity time-series in compact, partitio
 
 ## Scope
 
-This is **GB electricity**, not full UK electricity.
+This is GB electricity, not full UK electricity.
 
 Elexon settles the Great Britain electricity market. Northern Ireland sits in the separate all-island Single Electricity Market. The distinction matters because interconnector and border-flow datasets can treat Moyle and related flows differently from domestic GB generation and demand.
 
 ## Data source register
 
-The detailed source register is:
-
-```text
-DATA_SOURCES.md
-```
+The detailed source register is `DATA_SOURCES.md`.
 
 It records the Elexon endpoints, trust status, grain, idempotency keys, cleaning rules and Parquet output paths.
 
+## Two source pathways
+
+This repository has two different source pathways and they must not be confused.
+
+Historical backfill source:
+
+The one-time historical backfill clones the retiring `Ventusltd/globalgrid2050` source tree inside the GitHub runner and converts its CSV history into clean Parquet.
+
+The historical backfill does not fetch all history directly from the live Elexon API.
+
+The backfill excludes overlapping combined CSV files, deduplicates by declared key, verifies the output, and commits only the Parquet data and audit report.
+
+Monthly updater source:
+
+The monthly updater fetches new or repaired months from Elexon API endpoints.
+
+It does not repeatedly re-fetch full history.
+
+It is the forward-maintenance path after the historical base has landed.
+
 ## Source datasets
 
-```text
-FUELINST provisional 5-minute generation
-endpoint: https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELINST
-status: candidate / provisional
-idempotency key: periodStartUTC + fuelType
+FUELINST provisional generation.
 
-FUELHH settled half-hourly generation
-endpoint: https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELHH
-status: confirmed / settled
-idempotency key: time + technology
+Endpoint for monthly updater: https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELINST
 
-Elexon system prices
-endpoint: https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/system-prices/YYYY-MM-DD
-status: price data
-idempotency key: periodStartUTC
-```
+Status: candidate or provisional.
+
+Idempotency key: periodStartUTC plus fuelType.
+
+FUELHH settled half-hourly generation.
+
+Endpoint for monthly updater: https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELHH
+
+Status: confirmed or settled.
+
+Idempotency key: time plus technology.
+
+Elexon system prices.
+
+Endpoint for monthly updater: https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/system-prices/YYYY-MM-DD
+
+Status: price data.
+
+Idempotency key: periodStartUTC.
 
 ## Parquet layout
 
-```text
-generation/dataset=fuelinst/year=YYYY/month=M/data_0.parquet
-generation/dataset=fuelhh/year=YYYY/month=M/data_0.parquet
-prices/year=YYYY/month=M/data_0.parquet
-```
+Generation FUELINST path pattern: generation/dataset=fuelinst/year=YYYY/month=M/data_0.parquet
+
+Generation FUELHH path pattern: generation/dataset=fuelhh/year=YYYY/month=M/data_0.parquet
+
+Prices path pattern: prices/year=YYYY/month=M/data_0.parquet
+
+DuckDB may also create data_1.parquet or later numbered files inside a partition. That is not automatically a bug. Multiple physical files are acceptable if total rows equal distinct declared keys.
 
 Packaging rule:
 
-```text
-format: Parquet
-compression: zstd
-raw CSV committed here: no
-monolith clone committed here: no
-```
+Format: Parquet.
+
+Compression: zstd.
+
+Raw CSV committed here: no.
+
+Monolith clone committed here: no.
 
 ## One-time historical backfill
 
-The historical backfill workflow is:
+The historical backfill workflow is `.github/workflows/backfill_history.yml`.
 
-```text
-.github/workflows/backfill_history.yml
-```
+It is manually triggered from GitHub Actions.
 
-It is manually triggered from GitHub Actions. It clones the retiring source repo inside the runner, runs:
+It clones the retiring source repo inside the runner and runs `pipelines/port_csv_to_parquet.py`.
 
-```text
-pipelines/port_csv_to_parquet.py
-```
+That wrapper calls `pipelines/port_csv_to_parquet_impl.py`, where the current implementation lives.
 
-and commits only:
+The workflow commits only generation, prices and reports.
 
-```text
-generation/
-prices/
-reports/latest_parquet_audit.json
-```
+The backfill must pass real data-law checks before it should be trusted.
 
-The backfill must match the known tripwires before it commits:
+Hard invariants:
 
-```text
-source CSV:      ~1,218 MB
-Parquet output:  ~33.6 MB
-partition files: 319
-canary rows:     156,960 rows in generation/dataset=fuelinst/year=2023/month=9
-```
+FUELINST 2023 month 9 canary must remain exactly 156,960 rows.
+
+FUELINST duplicate key groups must be zero on periodStartUTC plus fuelType.
+
+FUELHH duplicate key groups must be zero on time plus technology.
+
+Prices duplicate key groups must be zero on periodStartUTC.
+
+Moving quantities:
+
+Parquet file count is not a fixed target.
+
+Total megabytes is not a fixed target.
+
+Row counts for living months are not fixed permanent targets.
+
+These values can grow as source data grows. They should be recorded and monitored, not treated as exact equality checks.
+
+The first clean historical backfill is recorded in `CHANGELOG.md`. That clean run verified 456 Parquet files, zero duplicate key groups, and the FUELINST canary at 156,960 rows. The number 456 is evidence of that run, not a permanent law.
 
 ## Automated monthly updater
 
-The active monthly process is:
+The active monthly process is `pipelines/fetch_latest_month.py` plus `.github/workflows/monthly_update.yml`.
 
-```text
-pipelines/fetch_latest_month.py
-.github/workflows/monthly_update.yml
-```
-
-The workflow runs automatically once per month and fetches only the previous closed calendar month by default.
-
-It does **not** repeatedly re-fetch the full history.
+The workflow is scheduled to run once per month and fetch only the previous closed calendar month by default.
 
 Default monthly behaviour:
 
-```text
-Run date: 2nd day of each month at 06:00 UTC
-Date range fetched: previous complete calendar month
-Datasets: fuelinst fuelhh prices
-Output: rewritten month Parquet partitions and reports
-Commit: generation/, prices/, reports/
-```
+Run date: 2nd day of each month at 06:00 UTC.
 
-Manual `workflow_dispatch` remains available for controlled testing, repair or explicit backfill ranges.
+Date range fetched: previous complete calendar month.
 
-Example repair run:
+Datasets: fuelinst, fuelhh and prices.
 
-```text
-start_date: 2026-06-01
-end_date: 2026-06-30
-refetch_months: 1
-datasets: fuelinst fuelhh prices
-```
+Output: rewritten month Parquet partitions and reports.
+
+Commit: generation, prices and reports.
+
+Manual workflow_dispatch remains available for controlled testing, repair or explicit backfill ranges.
+
+Important status note:
+
+The monthly updater is implemented and documented, but it should be treated as unproven until a controlled workflow_dispatch run has been completed, audited and recorded in `CHANGELOG.md`.
+
+Do not rely on the unattended monthly schedule until that first end-to-end updater proof exists.
+
+Suggested first manual test:
+
+Use one complete month already covered by the dataset.
+
+Run all three datasets.
+
+Confirm the touched partitions are rewritten.
+
+Confirm duplicate key groups remain zero.
+
+Confirm the audit report records the target month, removed partitions, row counts and Parquet audit.
 
 ## Cleaning and merge discipline
 
-Every run fetches the full touched calendar month, removes the existing touched partition, deduplicates the fetched records by stable key, and writes the month partition fresh.
+Every run fetches or reads the full touched calendar month, removes the existing touched partition, deduplicates records by stable key, and writes the month partition fresh.
 
-```text
-FUELINST: periodStartUTC + fuelType
-FUELHH: time + technology
-PRICES: periodStartUTC
-```
+FUELINST key: periodStartUTC plus fuelType.
 
-This is how the repo avoids becoming another 1 GB CSV store.
+FUELHH key: time plus technology.
+
+Prices key: periodStartUTC.
+
+This is how the repo avoids duplicate compounding and avoids becoming another raw CSV store.
 
 ## Reports
 
-The monthly updater writes:
+The main audit reports are:
 
-```text
 reports/latest_parquet_audit.json
+
 reports/fetch_latest_month_latest.json
-```
 
-The package verification record is:
-
-```text
 reports/package_verification_summary.json
-```
 
-The plain-language decision log is:
+The decision and training documents are:
 
-```text
 HOW_WE_SOLVED_THE_DATA_ISSUES.md
-```
+
+CHANGELOG.md
+
+DEFINITIONS.md
+
+GLOBAL_GRID_OS_MISSION.md
 
 ## Query examples
 
 Maximum provisional FUELINST generation by fuel:
 
-```sql
 SELECT fuelType, max(generationMW)
 FROM read_parquet('generation/dataset=fuelinst/**/*.parquet')
 GROUP BY fuelType
 ORDER BY max(generationMW) DESC;
-```
 
 Settled FUELHH monthly MWh by technology:
 
-```sql
 SELECT
   year,
   month,
@@ -176,17 +207,38 @@ SELECT
 FROM read_parquet('generation/dataset=fuelhh/**/*.parquet')
 GROUP BY year, month, technology
 ORDER BY year, month, technology;
-```
+
+Price uniqueness check:
+
+SELECT count(*) AS rows, count(DISTINCT periodStartUTC) AS distinct_periods
+FROM read_parquet('prices/**/*.parquet');
+
+Rows must equal distinct_periods for prices.
 
 ## Governance
 
 Rules:
 
-- source endpoints must be logged in `DATA_SOURCES.md`;
-- fetch through the data repo, not the app repo;
-- write Parquet directly, not raw CSV;
-- no raw CSV committed here;
-- no app code here;
-- no source repo clone committed here;
-- monthly automation fetches only the previous complete month unless an explicit repair range is provided;
-- failed API calls, empty results or schema problems must make the workflow go red.
+Source endpoints must be logged in `DATA_SOURCES.md`.
+
+Fetch through the data repo, not the app repo.
+
+Write Parquet directly, not raw CSV.
+
+No raw CSV committed here.
+
+No app code here.
+
+No source repo clone committed here.
+
+Monthly automation fetches only the previous complete month unless an explicit repair range is provided.
+
+Failed API calls, empty results, duplicate keys, schema problems or canary corruption must make the workflow go red.
+
+A green workflow is not proof by itself.
+
+A matching file count is not proof by itself.
+
+A matching total size is not proof by itself.
+
+The proof must test the real data law.
