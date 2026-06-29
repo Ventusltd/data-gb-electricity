@@ -51,6 +51,11 @@ def convert(src_root: Path, out_root: Path) -> None:
         if target.exists():
             shutil.rmtree(target)
 
+    # DuckDB COPY with PARTITION_BY does not create missing top-level parent
+    # directories on a clean runner. Recreate them after cleanup before COPY.
+    (out_root / "generation").mkdir(parents=True, exist_ok=True)
+    (out_root / "prices").mkdir(parents=True, exist_ok=True)
+
     con = duckdb.connect()
     out = str(out_root)
     fi, fh, pr = src["fuelinst"], src["fuelhh"], src["prices"]
