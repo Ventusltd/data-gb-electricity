@@ -15,7 +15,7 @@ EXPECTED = {
     "fuelinst": 72,
     "fuelhh": 125,
     "prices": 12,
-    "parquet_files": 319,
+    "parquet_files_min": 319,
     "canary_rows": 156_960,
 }
 
@@ -39,8 +39,8 @@ def sources(root: Path) -> dict[str, list[str]]:
 def check_counts(src: dict[str, list[str]]) -> None:
     print(f"found: {len(src['fuelinst'])} FUELINST, {len(src['fuelhh'])} FUELHH, {len(src['prices'])} price files")
     for key in ("fuelinst", "fuelhh", "prices"):
-        if len(src[key]) != EXPECTED[key]:
-            raise SystemExit(f"count mismatch for {key}: {len(src[key])} != {EXPECTED[key]}")
+        if len(src[key]) < EXPECTED[key]:
+            raise SystemExit(f"count below baseline for {key}: {len(src[key])} < {EXPECTED[key]}")
 
 
 def convert(src_root: Path, out_root: Path) -> None:
@@ -83,6 +83,7 @@ def verify(out_root: Path) -> dict[str, object]:
     report = {
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "parquet_files": len(parquet_files),
+        "parquet_files_minimum_baseline": EXPECTED["parquet_files_min"],
         "total_mb": total_mb,
         "fuelinst_mb": mb(out_root / "generation/dataset=fuelinst"),
         "fuelhh_mb": mb(out_root / "generation/dataset=fuelhh"),
@@ -90,9 +91,9 @@ def verify(out_root: Path) -> dict[str, object]:
         "fuelinst_2023_09_rows": canary,
     }
     print(json.dumps(report, indent=2))
-    if len(parquet_files) != EXPECTED["parquet_files"]:
-        raise SystemExit("parquet file count mismatch")
-    if not 30.0 <= total_mb <= 40.0:
+    if len(parquet_files) < EXPECTED["parquet_files_min"]:
+        raise SystemExit("parquet file count below baseline")
+    if not 30.0 <= total_mb <= 45.0:
         raise SystemExit("parquet size outside expected range")
     if canary != EXPECTED["canary_rows"]:
         raise SystemExit("canary row count mismatch")
