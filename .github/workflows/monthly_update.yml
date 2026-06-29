@@ -1,0 +1,123 @@
+name: Monthly GB Electricity Parquet Update
+
+on:
+  schedule:
+    # Automatic monthly refresh: 06:00 UTC on the 2nd day of each month.
+    # The script fetches the previous complete calendar month by default.
+    - cron: '0 6 2 * *'
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: Optional repair/backfill start date YYYY-MM-DD. Leave blank for previous complete month.
+        required: false
+        default: ''
+      end_date:
+        description: Optional repair/backfill end date YYYY-MM-DD. Leave blank for previous complete month.
+        required: false
+        default: ''
+      refetch_months:
+        description: Recent complete months to re-fetch when dates are blank.
+        required: false
+        default: '1'
+      datasets:
+        description: Space-separated list from fuelinst fuelhh prices.
+        required: false
+        default: 'fuelinst fuelhh prices'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monthly-gb-electricity-parquet-update
+  cancel-in-progress: false
+
+jobs:
+  monthly-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      START_DATE: ${{ github.event.inputs.start_date || '' }}
+      END_DATE: ${{ github.event.inputs.end_date || '' }}
+      REFETCH_MONTHS: ${{ github.event.inputs.refetch_months || '1' }}
+      DATASETS: ${{ github.event.inputs.datasets || 'fuelinst fuelhh prices' }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify environment and install dependencies
+        run: |
+          set -euo pipefail
+          git --version
+          python3 --version
+          python3 -m pip install --upgrade pip
+          python3 -m pip install duckdb pyarrow
+          python3 -c "import duckdb, pyarrow; print('ok')"
+
+      - name: Build fetch arguments
+        id: fetch_args
+        run: |
+          set -euo pipefail
+          ARGS="--apply --datasets ${DATASETS} --refetch-months ${REFETCH_MONTHS}"
+          if [ -n "${START_DATE}" ]; then
+            ARGS="${ARGS} --start-date ${START_DATE}"
+          fi
+          if [ -n "${END_DATE}" ]; then
+            ARGS="${ARGS} --end-date ${END_DATE}"
+          fi
+          echo "args=${ARGS}" >> "$GITHUB_OUTPUT"
+          echo "Using arguments: ${ARGS}"
+
+      - name: Fetch latest month and write Parquet
+        run: |
+          set -euo pipefail
+          python3 pipelines/fetch_latest_month.py ${{ steps.fetch_args.outputs.args }}
+
+      - name: Print audit summary
+        if: always()
+        run: |
+          if [ -f reports/latest_parquet_audit.json ]; then
+            cat reports/latest_parquet_audit.json
+          else
+            echo "reports/latest_parquet_audit.json not found"
+          fi
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: latest-parquet-audit
+          path: |
+            reports/latest_parquet_audit.json
+            reports/fetch_latest_month_latest.json
+
+      - name: Commit Parquet outputs
+        run: |
+          set -euo pipefail
+          TARGET_MONTH=$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('reports/latest_parquet_audit.json')
+          if p.exists():
+              payload = json.loads(p.read_text())
+              print('_'.join(payload.get('targetMonths', ['unknown'])))
+          else:
+              print('unknown')
+          PY
+          )
+          git config user.name "gridbot"
+          git config user.email "bot@globalgrid2050.com"
+          git add generation/ prices/ reports/latest_parquet_audit.json reports/fetch_latest_month_latest.json
+          if git diff --cached --quiet; then
+            echo "No Parquet or audit changes to commit."
+            exit 0
+          fi
+          git commit -m "data(gb-electricity): auto monthly fetch ${TARGET_MONTH}"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin HEAD:"${GITHUB_REF_NAME}"
