@@ -197,7 +197,7 @@ def key_for(dataset: str, row: dict[str, Any]) -> tuple[str, str]:
     if dataset == "fuelhh":
         return (dt_key(row.get("time")), str(row.get("technology", "")))
     if dataset == "prices":
-        return (str(row.get("settlementDate", "")), str(row.get("settlementPeriod", "")))
+        return (dt_key(row.get("periodStartUTC")), "system_price")
     raise ValueError(dataset)
 
 
@@ -227,7 +227,8 @@ def write_records(dataset: str, records: list[dict[str, Any]], apply: bool) -> d
             if key[0] and key[1]:
                 merged[key] = row
         final_rows = [merged[key] for key in sorted(merged)]
-        item: dict[str, Any] = {"path": str(path), "existingRows": len(existing_rows), "newRows": len(new_rows), "finalRows": len(final_rows)}
+        duplicates_dropped = len(existing_rows) + len(new_rows) - len(final_rows)
+        item: dict[str, Any] = {"path": str(path), "existingRows": len(existing_rows), "newRows": len(new_rows), "finalRows": len(final_rows), "duplicatesDropped": duplicates_dropped}
         if apply:
             path.parent.mkdir(parents=True, exist_ok=True)
             table = pa.Table.from_pylist(final_rows, schema=SCHEMAS[dataset])
@@ -361,7 +362,7 @@ def main() -> int:
         "endDate": end.isoformat(),
         "datasets": args.datasets,
         "sourceLog": {"fuelinst": FUELINST_URL, "fuelhh": FUELHH_URL, "prices": SYSTEM_PRICE_URL + "/YYYY-MM-DD"},
-        "idempotencyKeys": {"fuelinst": ["periodStartUTC", "fuelType"], "fuelhh": ["time", "technology"], "prices": ["settlementDate", "settlementPeriod"]},
+        "idempotencyKeys": {"fuelinst": ["periodStartUTC", "fuelType"], "fuelhh": ["time", "technology"], "prices": ["periodStartUTC"]},
         "results": results,
     }
     write_reports(payload)
