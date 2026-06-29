@@ -1,0 +1,11 @@
+{
+  "generated_utc": "2026-06-29T12:57:16.560026+00:00",
+  "mode": "apply",
+  "parquet_files": 334,
+  "parquet_files_minimum_baseline": 319,
+  "total_mb": 33.883,
+  "fuelinst_mb": 26.299,
+  "fuelhh_mb": 4.814,
+  "prices_mb": 2.77,
+  "fuelinst_2023_09_rows": 156960
+}
