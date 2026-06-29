@@ -1,0 +1,1 @@
+Temporary note. The backfill size ceiling in pipelines/port_csv_to_parquet.py must be changed from an upper-and-lower range to a minimum floor only. The exact intended logic is: fail only when total_mb is below 25.0, not when it is above 45.0. This file can be deleted after the code patch lands.
