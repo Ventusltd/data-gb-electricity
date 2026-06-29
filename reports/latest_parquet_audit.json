@@ -1,11 +1,16 @@
 {
-  "generated_utc": "2026-06-29T12:57:16.560026+00:00",
+  "generated_utc": "2026-06-29T14:10:41.255872+00:00",
   "mode": "apply",
-  "parquet_files": 334,
-  "parquet_files_minimum_baseline": 319,
-  "total_mb": 33.883,
-  "fuelinst_mb": 26.299,
-  "fuelhh_mb": 4.814,
-  "prices_mb": 2.77,
-  "fuelinst_2023_09_rows": 156960
+  "parquet_files": 456,
+  "parquet_files_minimum_baseline": 300,
+  "total_mb": 93.407,
+  "fuelinst_mb": 82.352,
+  "fuelhh_mb": 7.993,
+  "prices_mb": 3.063,
+  "fuelinst_2023_09_rows": 156960,
+  "duplicate_key_groups": {
+    "fuelinst": 0,
+    "fuelhh": 0,
+    "prices": 0
+  }
 }
