@@ -124,31 +124,13 @@ The old monolith raw CSV is treated as cold-storage source of truth during the t
 
 Do not commit raw CSV to this repo.
 
-## Workflow templates
+## One-shot port discipline
 
-Workflow templates have been added under:
+The first Parquet port is a one-shot data migration, not a recurring automation job.
 
-```text
-workflow_templates/01-audit-source-counts.yml
-workflow_templates/02-build-parquet.yml
-```
+Do not create a new GitHub Actions workflow just to perform the first port if a verified Parquet package already exists. Commit the verified Parquet tree, script, README and audit report directly.
 
-The intended active workflow locations are:
-
-```text
-.github/workflows/01-audit-source-counts.yml
-.github/workflows/02-build-parquet.yml
-```
-
-The audit workflow checks source file counts and writes an audit artifact.
-
-The build workflow requires manual confirmation with:
-
-```text
-BUILD_PARQUET
-```
-
-It then builds verified Parquet and commits only generated Parquet outputs plus the audit report.
+A future live updater is a separate recurring pipeline and should be designed deliberately later.
 
 ## Governance
 
