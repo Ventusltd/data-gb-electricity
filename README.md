@@ -2,7 +2,7 @@
 
 GB electricity data repository for the GlobalGrid2050 federation.
 
-This repository is intended to hold Great Britain electricity time-series in partitioned Parquet form. It is the data layer for the federated successors of the old `globalgrid2050` monolith.
+This repository holds Great Britain electricity time-series in compact, partitioned Parquet form. It is the data layer for the federated successors of the old `globalgrid2050` monolith.
 
 ## Scope
 
@@ -10,53 +10,39 @@ This is **GB electricity**, not full UK electricity.
 
 Elexon settles the Great Britain electricity market. Northern Ireland sits in the separate all-island Single Electricity Market. The distinction matters because interconnector and border-flow datasets can treat Moyle and related flows differently from domestic GB generation and demand.
 
-## Source datasets
+## Data source register
 
-The current source-of-truth raw CSV lives in the retiring monolith:
+The detailed source register is:
 
 ```text
-https://github.com/Ventusltd/globalgrid2050
+DATA_SOURCES.md
 ```
 
-The three source sets used for the first Parquet port are:
+It records the Elexon endpoints, trust status, grain, idempotency keys, cleaning rules and Parquet output paths.
+
+## Source datasets
+
+The three active datasets are:
 
 ```text
 FUELINST provisional 5-minute generation
-source path: globalgrid2050/data/generation/archive/*/*.csv
-schema: source, periodStartUTC, fuelType, generationMW, publishTimeUTC, fetchedAtUTC
-status: candidate
+endpoint: https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELINST
+schema: source, periodStartUTC, fuelType, generationMW, publishTimeUTC, fetchedAtUTC, dataset
+status: candidate / provisional
+idempotency key: periodStartUTC + fuelType
 
 FUELHH settled half-hourly generation
-source path: globalgrid2050/data/generation/fuelhh_halfhourly/*/*.csv
-schema: time, technology, generationMW, source
-status: confirmed
+endpoint: https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELHH
+schema: time, technology, generationMW, source, dataset
+status: confirmed / settled
+idempotency key: time + technology
 
 Elexon system prices
-source path: globalgrid2050/data/electricity/elexon_system_prices_*.csv
+endpoint: https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/system-prices/YYYY-MM-DD
 schema: source, settlementDate, settlementPeriod, periodStartUTC, systemBuyPriceGBPperMWh, systemSellPriceGBPperMWh, netImbalanceVolumeMWh, fetchedAtUTC
 status: price data
+idempotency key: settlementDate + settlementPeriod
 ```
-
-## Tripwire counts
-
-The first conversion must match these source counts:
-
-```text
-FUELINST = 72 CSV files
-FUELHH   = 125 CSV files
-PRICES   = 12 CSV files
-```
-
-The expected Parquet output from the tested recipe is approximately:
-
-```text
-source CSV:      ~1,218 MB
-Parquet output:  ~33.6 MB
-partition files: 319
-canary rows:     156,960 rows in generation/dataset=fuelinst/year=2023/month=9
-```
-
-If these numbers differ materially, stop and inspect the source data or paths before committing.
 
 ## Parquet layout
 
@@ -68,27 +54,81 @@ generation/dataset=fuelhh/year=YYYY/month=M/data_0.parquet
 prices/year=YYYY/month=M/data_0.parquet
 ```
 
-## Pipeline
+Packaging rule:
 
-Conversion script:
+```text
+format: Parquet
+compression: zstd
+raw CSV committed here: no
+monolith clone committed here: no
+```
+
+## Automated monthly updater
+
+The active monthly process is:
+
+```text
+pipelines/fetch_elexon_api_to_parquet.py
+.github/workflows/elexon_api_to_parquet_monthly.yml
+```
+
+The workflow runs automatically once per month and fetches only the previous closed calendar month by default.
+
+It does **not** repeatedly re-fetch the full history.
+
+Default monthly behaviour:
+
+```text
+Run date: 7th day of each month at 03:17 UTC
+Date range fetched: previous calendar month
+Datasets: fuelinst fuelhh prices
+Output: merged Parquet partitions and reports
+Commit: generation/, prices/, reports/
+```
+
+Manual `workflow_dispatch` remains available only for controlled repair or explicit backfill ranges.
+
+Example repair run:
+
+```text
+start_date: 2026-06-01
+end_date: 2026-06-30
+datasets: fuelinst fuelhh prices
+commit_outputs: true
+```
+
+## Cleaning and merge discipline
+
+Every run merges into month partitions by stable keys so re-runs overwrite rather than duplicate:
+
+```text
+FUELINST: periodStartUTC + fuelType
+FUELHH: time + technology
+PRICES: settlementDate + settlementPeriod
+```
+
+The updater reads any existing partition, merges the newly fetched rows, sorts by key, then writes the same month partition back as zstd Parquet.
+
+This is how the repo avoids becoming another 1 GB CSV store.
+
+## Historical port record
+
+The first historical conversion was proven with these tripwires:
+
+```text
+source CSV:      ~1,218 MB
+Parquet output:  ~33.6 MB
+partition files: 319
+canary rows:     156,960 rows in generation/dataset=fuelinst/year=2023/month=9
+```
+
+The historical conversion script remains available as the reproducibility record:
 
 ```text
 pipelines/port_csv_to_parquet.py
 ```
 
-Audit only:
-
-```bash
-python3 pipelines/port_csv_to_parquet.py --source-root ../globalgrid2050
-```
-
-Build and verify:
-
-```bash
-python3 pipelines/port_csv_to_parquet.py --source-root ../globalgrid2050 --apply
-```
-
-The script is deliberately strict. It checks source counts, writes partitioned Parquet, checks the total Parquet file count, checks output size range, and verifies the 2023-09 FUELINST canary row count.
+It converts the retiring monolith raw CSV into the same partitioned Parquet layout. The old monolith raw CSV is treated as cold-storage source of truth during transition and is deliberately not committed here.
 
 ## DuckDB query examples
 
@@ -114,38 +154,38 @@ GROUP BY year, month, technology
 ORDER BY year, month, technology;
 ```
 
-## Regeneration path
+## Reports
+
+The monthly updater writes:
 
 ```text
-old monolith raw CSV -> pipelines/port_csv_to_parquet.py -> partitioned Parquet
+reports/elexon_api_to_parquet_latest.json
+reports/elexon_api_to_parquet_latest.md
+reports/elexon_api_to_parquet_YYYYMMDDTHHMMSSZ.json
 ```
 
-The old monolith raw CSV is treated as cold-storage source of truth during the transition and is deliberately not committed here.
+The package verification record is:
 
-Do not commit raw CSV to this repo.
+```text
+reports/package_verification_summary.json
+```
 
-## One-shot port discipline
+The plain-language decision log is:
 
-The first Parquet port is a one-shot data migration, not a recurring automation job.
-
-Do not create a new GitHub Actions workflow just to perform the first port if a verified Parquet package already exists. Commit the verified Parquet tree, script, README and audit report directly.
-
-A future live updater is a separate recurring pipeline and should be designed deliberately later.
+```text
+HOW_WE_SOLVED_THE_DATA_ISSUES.md
+```
 
 ## Governance
 
 Rules:
 
-- audit before build;
+- source endpoints must be logged in `DATA_SOURCES.md`;
+- fetch through the data repo, not the app repo;
+- write Parquet directly, not raw CSV;
 - no raw CSV committed here;
 - no app code here;
-- no monolith copy here;
+- no monolith clone here;
 - no broad rewrite;
 - one data concern per repo;
-- verify tripwire numbers before committing output.
-
-## TODO
-
-TODO: live updater.
-
-The old monolith automation that fetched new Elexon data does not belong in future app repos. A fresh live updater should be built later inside this data repo, appending or regenerating monthly Parquet partitions with the same audit-first discipline.
+- monthly automation fetches only the previous month unless an explicit repair range is provided.
