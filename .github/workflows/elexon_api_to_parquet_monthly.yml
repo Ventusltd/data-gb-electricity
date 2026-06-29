@@ -1,0 +1,106 @@
+name: Elexon API to Parquet Monthly
+
+on:
+  schedule:
+    # Monthly autonomous refresh. Runs on the 7th at 03:17 UTC so the previous
+    # calendar month is closed before fetching and packaging.
+    - cron: '17 3 7 * *'
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: Optional inclusive start date YYYY-MM-DD. Empty means previous calendar month.
+        required: false
+        default: ''
+      end_date:
+        description: Optional inclusive end date YYYY-MM-DD. Empty means previous calendar month.
+        required: false
+        default: ''
+      datasets:
+        description: Space-separated list from fuelinst fuelhh prices
+        required: false
+        default: 'fuelinst fuelhh prices'
+      commit_outputs:
+        description: Commit Parquet and reports
+        required: false
+        default: 'true'
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: write
+
+concurrency:
+  group: elexon-api-to-parquet-monthly
+  cancel-in-progress: false
+
+jobs:
+  fetch-package-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout data repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyarrow
+          python - <<'PY'
+          import pyarrow
+          print('pyarrow ok', pyarrow.__version__)
+          PY
+
+      - name: Build argument list
+        id: args
+        env:
+          START_DATE: ${{ inputs.start_date || '' }}
+          END_DATE: ${{ inputs.end_date || '' }}
+          DATASETS: ${{ inputs.datasets || 'fuelinst fuelhh prices' }}
+        run: |
+          set -euo pipefail
+          ARGS="--apply --datasets ${DATASETS}"
+          if [ -n "${START_DATE}" ]; then
+            ARGS="${ARGS} --start-date ${START_DATE}"
+          fi
+          if [ -n "${END_DATE}" ]; then
+            ARGS="${ARGS} --end-date ${END_DATE}"
+          fi
+          echo "args=${ARGS}" >> "$GITHUB_OUTPUT"
+          echo "Using args: ${ARGS}"
+
+      - name: Fetch Elexon API and write Parquet
+        run: |
+          python pipelines/fetch_elexon_api_to_parquet.py ${{ steps.args.outputs.args }}
+
+      - name: Upload run reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: elexon-api-to-parquet-reports
+          path: |
+            reports/elexon_api_to_parquet_latest.json
+            reports/elexon_api_to_parquet_latest.md
+
+      - name: Commit Parquet and reports
+        if: ${{ inputs.commit_outputs != 'false' }}
+        run: |
+          set -euo pipefail
+          git config user.name "gridbot"
+          git config user.email "bot@globalgrid2050.com"
+          git add generation/ prices/ reports/ || true
+          if git diff --cached --quiet; then
+            echo "No Parquet or report changes to commit."
+            exit 0
+          fi
+          git commit -m "data(gb-electricity): monthly Elexon API Parquet refresh $(date -u +'%Y-%m-%d')"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin HEAD:"${GITHUB_REF_NAME}"
