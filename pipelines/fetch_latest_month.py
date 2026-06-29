@@ -2,15 +2,15 @@
 """Monthly Elexon API fetcher for data-gb-electricity.
 
 Default behaviour:
-  * fetch the most recent complete calendar month;
+  * fetch the most recent complete calendar month plus a trailing lookback;
   * fetch only requested month(s), not full history;
-  * fail loudly on API/schema/empty-data problems;
-  * rewrite each touched month partition fresh as zstd Parquet;
+  * fail loudly on API/schema/empty-data/duplicate-key problems;
+  * remove and rewrite each touched month partition fresh as zstd Parquet;
   * write a lightweight audit report for the GitHub Actions run.
 
-This script deliberately delegates endpoint parsing and Parquet writing helpers to
-fetch_elexon_api_to_parquet.py so the monthly updater and repair runs use the
-same source-normalisation logic.
+This script delegates endpoint parsing and Parquet writing helpers to the
+hardened Elexon helper so the updater uses the same key and schema discipline as
+the verified historical backfill.
 """
 from __future__ import annotations
 
@@ -20,8 +20,9 @@ import json
 import shutil
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
-from fetch_elexon_api_to_parquet import (
+from fetch_elexon_api_to_parquet_hardened import (
     fetch_fuelhh,
     fetch_fuelinst,
     fetch_prices,
@@ -31,10 +32,11 @@ from fetch_elexon_api_to_parquet import (
 )
 
 DATASETS = ("fuelinst", "fuelhh", "prices")
+LONDON = ZoneInfo("Europe/London")
 
 
 def previous_complete_month(today: dt.date | None = None) -> tuple[int, int]:
-    today = today or dt.datetime.now(dt.timezone.utc).date()
+    today = today or dt.datetime.now(LONDON).date()
     first_this_month = dt.date(today.year, today.month, 1)
     last_prev_month = first_this_month - dt.timedelta(days=1)
     return last_prev_month.year, last_prev_month.month
@@ -48,7 +50,7 @@ def shift_month(year: int, month: int, offset: int) -> tuple[int, int]:
 def month_bounds(year: int, month: int) -> tuple[dt.date, dt.date]:
     start = dt.date(year, month, 1)
     end = dt.date(year, 12, 31) if month == 12 else dt.date(year, month + 1, 1) - dt.timedelta(days=1)
-    yesterday = dt.datetime.now(dt.timezone.utc).date() - dt.timedelta(days=1)
+    yesterday = dt.datetime.now(LONDON).date() - dt.timedelta(days=1)
     return start, min(end, yesterday)
 
 
@@ -95,7 +97,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch latest complete Elexon month and write compact Parquet")
     parser.add_argument("--start-date", help="Optional repair/backfill start date; expanded to full calendar month(s).")
     parser.add_argument("--end-date", help="Optional repair/backfill end date; expanded to full calendar month(s).")
-    parser.add_argument("--refetch-months", type=int, default=1, help="Number of recent complete months to fetch when start/end are omitted. Default 1.")
+    parser.add_argument("--refetch-months", type=int, default=3, help="Number of recent complete months to fetch when start/end are omitted. Default 3.")
     parser.add_argument("--datasets", nargs="+", default=list(DATASETS), choices=list(DATASETS))
     parser.add_argument("--fuelinst-window-days", type=int, default=1)
     parser.add_argument("--fuelhh-window-days", type=int, default=7)
@@ -156,7 +158,7 @@ def main() -> int:
 
     audit = parquet_audit()
     payload = {
-        "schemaVersion": "fetch_latest_month.v1",
+        "schemaVersion": "fetch_latest_month.hardened.v1",
         "updatedUTC": utc_now_text(),
         "apply": args.apply,
         "targetMonths": [f"{y}-{m:02d}" for y, m in target_months],
@@ -166,11 +168,13 @@ def main() -> int:
             "fuelinst": ["periodStartUTC", "fuelType"],
             "fuelhh": ["time", "technology"],
             "prices": ["periodStartUTC"],
-            "method": "full touched month partition directories are removed, re-fetched, deduped and rewritten fresh",
+            "method": "full touched month partition directories are removed, re-fetched, deduped, schema-checked, readback-checked and rewritten fresh",
         },
         "removedPartitionsBeforeRewrite": removed,
         "results": results,
         "parquetAudit": audit,
+        "timeBasis": "target months are derived in Europe/London civil time; timestamps are stored in UTC",
+        "priceRevisionPolicy": "latest-visible-as-of-run-date with a trailing refetch window",
     }
 
     reports = Path("reports")
