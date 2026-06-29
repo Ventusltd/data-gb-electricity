@@ -113,11 +113,25 @@ jobs:
           )
           git config user.name "gridbot"
           git config user.email "bot@globalgrid2050.com"
-          git add generation/ prices/ reports/latest_parquet_audit.json reports/fetch_latest_month_latest.json
+          if [ -d generation ]; then
+            git add generation/
+          fi
+          if [ -d prices ]; then
+            git add prices/
+          fi
+          if [ -d reports ]; then
+            git add reports/
+          fi
           if git diff --cached --quiet; then
             echo "No Parquet or audit changes to commit."
             exit 0
           fi
           git commit -m "data(gb-electricity): auto monthly fetch ${TARGET_MONTH}"
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push origin HEAD:"${GITHUB_REF_NAME}"
+          if git push origin HEAD:"${GITHUB_REF_NAME}"; then
+            echo "Pushed monthly outputs."
+          else
+            echo "Initial push rejected; rebasing once and retrying."
+            git fetch origin "${GITHUB_REF_NAME}"
+            git rebase "origin/${GITHUB_REF_NAME}"
+            git push origin HEAD:"${GITHUB_REF_NAME}"
+          fi
