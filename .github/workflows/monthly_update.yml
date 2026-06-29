@@ -2,9 +2,9 @@ name: Monthly GB Electricity Parquet Update
 
 on:
   schedule:
-    # Automatic monthly refresh: 06:00 UTC on the 2nd day of each month.
-    # The script fetches the previous complete calendar month by default.
-    - cron: '0 6 2 * *'
+    # Automatic monthly refresh: 06:17 UTC on the 2nd day of each month.
+    # The script fetches the previous complete calendar month plus trailing lookback by default.
+    - cron: '17 6 2 * *'
   workflow_dispatch:
     inputs:
       start_date:
@@ -18,7 +18,7 @@ on:
       refetch_months:
         description: Recent complete months to re-fetch when dates are blank.
         required: false
-        default: '1'
+        default: '3'
       datasets:
         description: Space-separated list from fuelinst fuelhh prices.
         required: false
@@ -26,6 +26,10 @@ on:
 
 permissions:
   contents: write
+
+defaults:
+  run:
+    shell: bash
 
 concurrency:
   group: monthly-gb-electricity-parquet-update
@@ -38,7 +42,7 @@ jobs:
     env:
       START_DATE: ${{ github.event.inputs.start_date || '' }}
       END_DATE: ${{ github.event.inputs.end_date || '' }}
-      REFETCH_MONTHS: ${{ github.event.inputs.refetch_months || '1' }}
+      REFETCH_MONTHS: ${{ github.event.inputs.refetch_months || '3' }}
       DATASETS: ${{ github.event.inputs.datasets || 'fuelinst fuelhh prices' }}
     steps:
       - name: Checkout repo
