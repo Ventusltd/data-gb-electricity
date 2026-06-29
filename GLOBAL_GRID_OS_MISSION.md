@@ -68,6 +68,16 @@ The homepage repo is the catalogue layer. It points people to the tools, dataset
 
 This separation prevents the old monolith problem where app code, raw data, scripts, documentation and experiments all lived in one place.
 
+## Document Precedence
+
+This mission document is the spine for the Global Grid OS architecture and philosophy.
+
+If an older synthesis document conflicts with this mission document on architecture, independence, data ownership or serving layers, this mission document wins.
+
+If a specialised file gives a more precise implementation rule for a particular repo, that specialised file wins for that narrow implementation detail.
+
+The intended hierarchy is mission first, then repo README, then data source register, then changelog, then implementation files.
+
 ## Data Doctrine
 
 The data must be reproducible, not merely uploaded.
@@ -81,6 +91,22 @@ The repo should prefer pipeline evidence over trust in one-off files.
 The repo should record the source, the method, the key, the schema, the checks, the failures and the fixes.
 
 The repo should treat every painful bug as training data.
+
+A green workflow is not proof by itself.
+
+A matching file count is not proof by itself.
+
+A matching headline size is not proof by itself.
+
+The proof must test the real data law.
+
+For a keyed dataset, that means total rows must equal distinct keys.
+
+For a settled historical canary, that means the canary row count must hold exactly.
+
+For a schema contract, that means the actual schema must match the expected schema.
+
+Verification must test the property that matters, not merely the property that is easy to check.
 
 ## Invariants, Not Snapshots
 
@@ -142,17 +168,21 @@ AI can audit, patch, test and document.
 
 The repository must hold the durable record.
 
-The working model is separation of duties.
-
-One assistant can audit.
-
-One assistant can patch.
-
-One assistant can test.
-
 The human owner decides.
 
-No assistant should mark its own homework without evidence.
+The protective principle is not merely assigning one assistant to audit, one to patch and one to test.
+
+The protective principle is that no single actor should both make a change and be the sole judge that it worked.
+
+Every claimed fix must be verified against the real data or real behaviour independently of whoever made the change.
+
+An assistant can propose a fix.
+
+An assistant can implement a fix.
+
+An assistant can test a fix.
+
+But the evidence must live outside the assistant's opinion, in the repo, the audit output, the workflow result or the data itself.
 
 ## What This Project Is Not
 
