@@ -1,0 +1,45 @@
+name: Historical GB Electricity Parquet Backfill
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install duckdb pyarrow
+      - name: Clone source repo
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/Ventusltd/globalgrid2050.git globalgrid2050
+      - name: Build Parquet
+        run: |
+          set -euo pipefail
+          python3 pipelines/port_csv_to_parquet.py --source-root globalgrid2050 --apply
+      - name: Commit outputs
+        run: |
+          set -euo pipefail
+          git config user.name "gridbot"
+          git config user.email "bot@globalgrid2050.com"
+          git add generation/ prices/ reports/latest_parquet_audit.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "data(gb-electricity): add verified historical Parquet backfill"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin HEAD:"${GITHUB_REF_NAME}"
