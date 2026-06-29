@@ -8,6 +8,22 @@ Add new entries alphabetically. Each entry should explain what the thing is, why
 
 ---
 
+## Accepted Value Set
+
+An accepted value set is the list of values a column is allowed to contain.
+
+For this repo, examples include known dataset names, known fuel types or known technology group names.
+
+The discipline is that categorical fields should not silently accept new spellings or unexpected labels without being noticed. New legitimate values can be added, but they should be added deliberately.
+
+## Anomaly Band
+
+An anomaly band is a reasonable range around a moving quantity.
+
+It is used when exact equality is wrong because the data naturally changes over time.
+
+For this repo, row counts, file counts and monthly data volumes should usually be checked with floors or bands, not exact equality, unless the quantity is a true invariant.
+
 ## API
 
 An API is a structured way for software to request data from another system.
@@ -20,7 +36,7 @@ The discipline is that every API source must be named, its endpoint must be reco
 
 An audit report is a machine-readable record of what a pipeline produced during a run.
 
-In this repo, audit reports record facts such as generated time, file counts, data size, target months and canary row counts.
+In this repo, audit reports record facts such as generated time, file counts, data size, target months, duplicate-key checks and canary row counts.
 
 The audit report is not the data itself. It is the evidence trail showing what the pipeline did.
 
@@ -48,6 +64,16 @@ In this repo, the FUELINST 2023 month 9 canary must remain 156,960 rows. That mo
 
 The canary is a true invariant. If it fails, the pipeline should fail.
 
+## Compound Key
+
+A compound key is a unique identifier made from more than one column.
+
+This matters when no single column uniquely identifies a row.
+
+In this repo, FUELINST uses periodStartUTC plus fuelType. FUELHH uses time plus technology. Prices use periodStartUTC.
+
+The discipline is that every published dataset must have a declared grain and a declared key.
+
 ## CSV
 
 CSV means comma-separated values. It is a simple text format where rows and columns are stored as readable text.
@@ -55,6 +81,30 @@ CSV means comma-separated values. It is a simple text format where rows and colu
 CSV is useful for exchange and transparency, but it is inefficient for large repeated time-series data. It repeats timestamps, strings and source labels many times.
 
 In the old repo, raw CSV helped preserve the source data, but it made the working tree too large. In this repo, CSV is treated as transition source material, not the preferred storage format.
+
+## Data Contract
+
+A data contract is a stated agreement about what a dataset must look like and mean.
+
+It includes column names, data types, keys, accepted values, uniqueness rules and freshness expectations.
+
+In this repo, the data contract should be enforced at the Parquet boundary. If the published Parquet breaks the contract, the workflow should fail before committing.
+
+## Data Diff
+
+A data diff compares two versions of a dataset and shows what changed at row or value level.
+
+It is stronger than checking only file counts or total size.
+
+For this repo, data diff logic can prove that a monthly update only added or deliberately rewrote the intended partitions, instead of silently changing old history.
+
+## Data Quality Dimensions
+
+Data quality dimensions are the main categories used to judge whether data is fit for use.
+
+The most relevant dimensions here are accuracy, completeness, consistency, uniqueness, validity and timeliness.
+
+The duplicate-row bug was a uniqueness failure. A missing month would be a completeness failure. A stale updater would be a timeliness failure.
 
 ## Data Repository
 
@@ -64,13 +114,21 @@ This repo exists because data and application code move at different speeds. The
 
 The discipline is that the data repo should contain compact data, source registers, pipelines and audit evidence, not unrelated app code.
 
+## Distinct Count Check
+
+A distinct count check compares total rows with the number of unique keys.
+
+The principle is simple: if a dataset has one row per key, then total rows must equal distinct keys.
+
+This is the check that prevents duplicate timestamps or duplicate compound keys from silently entering the Parquet data.
+
 ## DuckDB
 
 DuckDB is an embedded analytical database engine.
 
 It lets a script run SQL directly over files such as CSV and Parquet without needing a separate database server.
 
-We used DuckDB because it can read many source CSV files, combine them, derive year and month fields from timestamps, and write partitioned Parquet quickly inside a GitHub Actions runner.
+We used DuckDB because it can read many source CSV files, combine them, derive year and month fields from timestamps, deduplicate by key, and write partitioned Parquet quickly inside a GitHub Actions runner.
 
 The key lesson from the backfill was that DuckDB can write partitioned output, but the top-level output folders must exist first on a clean runner. That is why the script now creates the generation and prices folders before writing.
 
@@ -82,6 +140,22 @@ The repo uses Elexon data for generation and system price datasets.
 
 The discipline is that Elexon source names, endpoints and cleaning keys must be documented so the data chain can be defended later.
 
+## Fail-Loud
+
+Fail-loud means the process stops clearly when something important is wrong.
+
+In this repo, duplicate keys, schema drift, empty API returns, missing key fields or canary corruption should stop the workflow.
+
+Fail-loud does not mean every optional path should kill the run. It means real data risks must not be hidden.
+
+## Floor Check
+
+A floor check says a moving quantity must be at least a known minimum.
+
+It is useful for living datasets that grow over time.
+
+The 319 Parquet file count became a floor, not an exact equality, because the dataset can grow.
+
 ## FUELHH
 
 FUELHH is an Elexon half-hourly generation dataset.
@@ -89,6 +163,8 @@ FUELHH is an Elexon half-hourly generation dataset.
 In this repo it is used as the settled or confirmed half-hourly generation source.
 
 It is important because FUELHH is better suited for confirmed historical reporting than fast provisional data.
+
+The key discipline is one row per time plus technology after cleaning.
 
 ## FUELINST
 
@@ -113,6 +189,14 @@ Idempotency means a process can be run more than once without compounding duplic
 In this repo, touched month partitions are rewritten fresh rather than appended blindly.
 
 That prevents duplicate rows from accumulating over time.
+
+## Idempotent Partition Overwrite
+
+Idempotent partition overwrite means deleting or replacing the whole target partition before writing the new version.
+
+It is safer than appending because re-running the same job converges to the same output instead of doubling rows.
+
+In this repo, the monthly updater removes the whole touched month partition directory before writing the fresh Parquet file.
 
 ## Invariant
 
@@ -146,6 +230,30 @@ It is different from the backfill. The backfill loads history. The monthly updat
 
 The updater should fetch only the required month or repair range, rewrite touched partitions fresh, and produce an audit report.
 
+## No Null Key Check
+
+A no null key check ensures every row has the fields needed to identify it.
+
+A row without its timestamp or key field cannot be safely deduplicated or joined.
+
+For this repo, nulls in periodStartUTC, time, fuelType or technology should be treated as hard data-quality failures unless explicitly quarantined.
+
+## OpenLineage
+
+OpenLineage is an emerging standard for recording metadata about data pipeline runs.
+
+This repo does not need a full OpenLineage implementation yet, but its audit JSON is moving in the same direction.
+
+The practical discipline is to record source files, run time, git SHA, row counts, distinct-key counts, schema version and validation results.
+
+## Pandera
+
+Pandera is a Python library for defining and checking data schemas in code.
+
+It can express column types, null rules, accepted values and compound uniqueness checks.
+
+It may be useful later because it is lighter than large data-quality platforms and fits a Python-first repo.
+
 ## Parquet
 
 Parquet is a column-based file format for analytical data.
@@ -171,6 +279,14 @@ A pipeline is a repeatable sequence of steps that turns source data into checked
 In this repo, the pipeline fetches or reads source data, cleans it, writes Parquet, verifies the output, writes an audit report, and commits the result.
 
 The discipline is that the pipeline must be reproducible. The repo should not depend on a static zip file someone says is correct.
+
+## Provenance and Lineage
+
+Provenance means evidence of where data came from and how it was produced.
+
+Lineage means the chain from source data through transformations to final output.
+
+In this repo, audit reports are the practical lineage trail. They should record resolved input files, source endpoints, output partitions and validation results.
 
 ## PyArrow
 
@@ -204,13 +320,45 @@ Schema discipline matters because a silent column change can break charts, calcu
 
 Schema problems should fail loudly.
 
+## Schema Drift
+
+Schema drift is an unplanned change in the structure of source data.
+
+Examples include a column being renamed, a timestamp changing type, or a numeric field arriving as text.
+
+Schema drift should fail loudly at the trust boundary instead of silently changing the published Parquet.
+
+## Schema Evolution
+
+Schema evolution is an intentional and documented change to a dataset structure.
+
+It is different from schema drift because it is deliberate, reviewed and explained.
+
+If this repo evolves a schema, the definition, scripts, audit report and downstream consumers should be updated together.
+
+## Schema-on-Write
+
+Schema-on-write means enforcing the schema before or during writing of the trusted output.
+
+This is appropriate for published Parquet because downstream users should not have to guess what the columns mean.
+
+In this repo, the Parquet boundary is where schema discipline should be strongest.
+
+## Small-Files Problem
+
+The small-files problem happens when a dataset is split into too many tiny files.
+
+Too many small files slow down listing, reading and management even if the total data size is modest.
+
+Year and month partitions are acceptable here. Per-day partitions would likely be too granular for this repo.
+
 ## Snapshot Check
 
 A snapshot check tests a value from one point in time.
 
 The original 319 Parquet file count was a snapshot check.
 
-It became a bug because the source data grew to 341 files. Snapshot checks should not be used as exact permanent laws for living datasets.
+It became a bug because the source data grew. Snapshot checks should not be used as exact permanent laws for living datasets.
 
 ## Source of Truth
 
@@ -220,6 +368,22 @@ For this repo, Elexon is the external source of truth for GB electricity market 
 
 The old monolith is a transition source for the historical backfill, but the future source of truth should be the documented API pathway.
 
+## Staging Output
+
+Staging output is temporary output written before publication.
+
+It allows the pipeline to build and audit data before replacing the trusted published files.
+
+This supports Write-Audit-Publish because bad staged data can be discarded without touching the published repo state.
+
+## Surrogate Key
+
+A surrogate key is an artificial key created from one or more real fields.
+
+It is useful when a dataset needs a single identifier for a compound grain.
+
+For example, periodStartUTC plus fuelType could be converted into one hashed key for testing or diffing, but the underlying grain must still be documented.
+
 ## System Prices
 
 System prices are Elexon imbalance price data for GB electricity settlement periods.
@@ -228,6 +392,14 @@ In this repo they are stored separately from generation data because prices and 
 
 The key used for prices is periodStartUTC.
 
+## Unix Fail-Loud Discipline
+
+Unix fail-loud discipline means shell scripts should stop when important commands fail.
+
+The usual pattern is set e, u and pipefail so unset variables, failed commands and failed pipeline stages do not pass silently.
+
+In this repo, that discipline should be used for build and audit steps. Intentional non-fatal commands should be marked clearly.
+
 ## Workflow Dispatch
 
 Workflow dispatch means manually starting a GitHub Actions workflow.
@@ -235,6 +407,14 @@ Workflow dispatch means manually starting a GitHub Actions workflow.
 In this repo, the historical backfill is triggered by workflow dispatch because it is a controlled one-time operation.
 
 Manual dispatch lets the operator choose when to run a high-impact workflow.
+
+## Write-Audit-Publish
+
+Write-Audit-Publish means writing data to a temporary or isolated place, auditing it, and publishing it only if all checks pass.
+
+It prevents bad data from being committed just because the write step completed.
+
+For this repo, the mature pattern is to build Parquet into a staging directory, run schema, canary and uniqueness checks, and only then replace generation and prices in the published tree.
 
 ## zstd Compression
 
