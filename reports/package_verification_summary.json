@@ -1,0 +1,42 @@
+{
+  "package_name": "data-gb-electricity-parquet-port.zip",
+  "package_sha256": "90f0df3fdcc266c6918a060876beca34503770f61fc9ba5c2d138b32354ffdff",
+  "verified_utc": "2026-06-29T10:10:00+00:00",
+  "file_count": 322,
+  "parquet_file_count": 319,
+  "extensions": {
+    ".parquet": 319,
+    ".py": 1,
+    ".md": 1,
+    ".json": 1
+  },
+  "contains_raw_csv": false,
+  "contains_workflows": false,
+  "contains_monolith_clone": false,
+  "audit": {
+    "source_csv_total_mb_approx": 1218.3,
+    "output_parquet_total_mb": 33.6,
+    "partition_files": 319,
+    "compression": "zstd",
+    "partition_scheme": "dataset=/year=/month=",
+    "by_dataset_mb": {
+      "generation_fuelinst": 26.2,
+      "generation_fuelhh": 4.8,
+      "prices": 2.6
+    },
+    "integrity_canary": {
+      "partition": "generation/dataset=fuelinst/year=2023/month=9",
+      "parquet_rows": 156960,
+      "source_csv_rows": 156960,
+      "match": true
+    }
+  },
+  "local_zip_inspection": {
+    "parquet_total_mb": 33.634,
+    "generation_fuelinst_mb": 26.249,
+    "generation_fuelhh_mb": 4.807,
+    "prices_mb": 2.578,
+    "fuelinst_2023_09_rows": 156960
+  },
+  "status": "verified package received; Parquet binary tree pending commit by binary-capable git path"
+}
