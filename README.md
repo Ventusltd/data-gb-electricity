@@ -1,5 +1,7 @@
 # data-gb-electricity
 
+AI READ FIRST: This repository follows the GlobalGrid2050 Data Discipline Manual in `Ventusltd/globalgrid2050-hompage/docs/DATA_DISCIPLINE_MANUAL.md`. Read that manual before patching, porting, backfilling, scheduling, publishing or wiring this repository to UI. Green is not proof. File count is not proof. Size is not proof. The proof is the declared data law tested on the declared key.
+
 GB electricity data repository for the GlobalGrid2050 federation.
 
 This repository holds Great Britain electricity time-series in compact, partitioned Parquet form. It is the data layer for the federated successors of the old `globalgrid2050` monolith.
@@ -122,13 +124,15 @@ The first clean historical backfill is recorded in `CHANGELOG.md`. That clean ru
 
 The active monthly process is `pipelines/fetch_latest_month.py` plus `.github/workflows/monthly_update.yml`.
 
-The workflow is scheduled to run once per month and fetch only the previous closed calendar month by default.
+The workflow is scheduled to run once per month and fetch the previous closed calendar month plus a trailing lookback by default.
 
 Default monthly behaviour:
 
-Run date: 2nd day of each month at 06:00 UTC.
+Run date: 2nd day of each month at 06:17 UTC.
 
-Date range fetched: previous complete calendar month.
+Date range fetched: previous complete calendar month plus the trailing refetch window.
+
+Default trailing refetch: 3 recent complete months when dates are blank.
 
 Datasets: fuelinst, fuelhh and prices.
 
