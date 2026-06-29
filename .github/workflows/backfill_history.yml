@@ -35,11 +35,25 @@ jobs:
           set -euo pipefail
           git config user.name "gridbot"
           git config user.email "bot@globalgrid2050.com"
-          git add generation/ prices/ reports/latest_parquet_audit.json
+          if [ -d generation ]; then
+            git add generation/
+          fi
+          if [ -d prices ]; then
+            git add prices/
+          fi
+          if [ -d reports ]; then
+            git add reports/
+          fi
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
           git commit -m "data(gb-electricity): add verified historical Parquet backfill"
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push origin HEAD:"${GITHUB_REF_NAME}"
+          if git push origin HEAD:"${GITHUB_REF_NAME}"; then
+            echo "Pushed backfill outputs."
+          else
+            echo "Initial push rejected; rebasing once and retrying."
+            git fetch origin "${GITHUB_REF_NAME}"
+            git rebase "origin/${GITHUB_REF_NAME}"
+            git push origin HEAD:"${GITHUB_REF_NAME}"
+          fi
