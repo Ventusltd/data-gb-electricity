@@ -4,45 +4,47 @@ A plain-language log of the data decisions behind `data-gb-electricity`, so any 
 
 ---
 
-## 2026-06-29 — Monthly autonomous API-to-Parquet updater added
+## 2026-06-29 — Backfill plus automated monthly updater
 
 ### What changed
 
-The data repo now has its own Elexon API fetch and packaging mechanism. It no longer depends on browser uploads, manual CSV handling, or the old monolith for new monthly data.
+The repo now has two data workflows:
+
+```text
+.github/workflows/backfill_history.yml
+.github/workflows/monthly_update.yml
+```
+
+The first is a one-time historical backfill. The second is an automatic monthly updater.
 
 ### What we added
 
 ```text
-pipelines/fetch_elexon_api_to_parquet.py
-.github/workflows/elexon_api_to_parquet_monthly.yml
-DATA_SOURCES.md
+pipelines/fetch_latest_month.py
+.github/workflows/monthly_update.yml
+.github/workflows/backfill_history.yml
 ```
 
-The workflow runs automatically once per month and fetches the previous closed calendar month by default. `workflow_dispatch` remains available for explicit repair ranges.
+The monthly workflow runs on a schedule and fetches only the previous complete calendar month by default. Manual dispatch remains available for testing and repair ranges.
 
-### Why
+### Why this is allowed
 
-The repo must independently log data sources, fetch from Elexon using GitHub runners, clean the records, package the data into compact Parquet, and avoid accumulating raw CSV.
+This is a deliberate exception to the usual manual-apply doctrine. It is justified because the operation is narrow, data-only, idempotent, and fail-loud. It writes compact Parquet partitions, not raw CSV or app code. Published facts are still verified by the human through the UI and independent checks.
 
-### Packaging rule
+### Guarantees
 
 ```text
-generation/dataset=fuelinst/year=YYYY/month=M/data_0.parquet
-generation/dataset=fuelhh/year=YYYY/month=M/data_0.parquet
-prices/year=YYYY/month=M/data_0.parquet
+FUELINST key: periodStartUTC + fuelType
+FUELHH key: time + technology
+PRICES key: periodStartUTC
+Failure behaviour: API errors, empty returns or schema problems exit non-zero.
 ```
 
-The updater merges by stable keys so re-runs overwrite rather than duplicate:
-
-```text
-FUELINST: periodStartUTC + fuelType
-FUELHH: time + technology
-PRICES: settlementDate + settlementPeriod
-```
+Touched month partitions are fetched for the full month, deduplicated and rewritten fresh. This prevents duplicate compounding over time.
 
 ### Known gap
 
-The historical Parquet package remains verified. The new monthly updater solves the ongoing data issue going forward and can be used for controlled repair or backfill ranges where needed.
+The first successful workflow run still needs to be triggered and checked in GitHub Actions.
 
 ---
 
@@ -50,7 +52,7 @@ The historical Parquet package remains verified. The new monthly updater solves 
 
 ### What was wrong
 
-The retiring `globalgrid2050` monolith carried a **1.2 GB** `data/generation/` directory. The cause was not complexity. It was verbosity. Elexon generation data was stored as raw CSV in long format: one row per timestamp per fuel, repeatedly storing timestamp strings, source text and fetch timestamps.
+The retiring `globalgrid2050` source tree carried a **1.2 GB** `data/generation/` directory. The cause was not complexity. It was verbosity. Elexon generation data was stored as raw CSV in long format: one row per timestamp per fuel, repeatedly storing timestamp strings, source text and fetch timestamps.
 
 ### Why it was confusing
 
@@ -85,7 +87,7 @@ Code and data have different clocks. The app should stay small. The data repo ca
 
 ### Why the raw CSV is not committed here
 
-The old monolith raw CSV is treated as cold-storage source of truth during transition. This repo stores distilled Parquet and reproducible scripts, not raw CSV bulk.
+The old raw CSV is treated as cold-storage source of truth during transition. This repo stores distilled Parquet and reproducible scripts, not raw CSV bulk.
 
 ### Bug remembered
 
