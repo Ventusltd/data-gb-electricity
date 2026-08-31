@@ -1,0 +1,86 @@
+# Keep the browser-sized price rollup in step with the Parquet.
+#
+# WHY ONE WORKFLOW, AND WHY HERE
+#
+# globalgrid2050 carries 240 workflows and they were all frozen to manual
+# dispatch because that had become unmanageable. Unfreezing them would rebuild
+# the problem the freeze solved. So this is not a restart of anything: it is one
+# small job, in the repository that owns the data, chained to the monthly update
+# that is already running here.
+#
+# The chain it completes:
+#
+#   Elexon  ->  monthly_update.yml       (this repo, already scheduled)
+#           ->  price-decade-rollup.json (this workflow)
+#           ->  gb-electricity-ui        (charts)
+#           ->  gridatlas                (a panel beside the map)
+#
+# Collection was never what broke. What broke is that nothing consumed the
+# result any more, so the published figures stopped moving while the data kept
+# arriving.
+#
+# It runs after monthly_update, not on a guessed clock: workflow_run means it
+# fires when there is actually something new to aggregate, and never otherwise.
+
+name: Refresh the price decade rollup
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Monthly GB Electricity Parquet Update"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - 'derived/build_price_decade_rollup.py'
+      - '.github/workflows/refresh_price_decade_rollup.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: price-decade-rollup
+  cancel-in-progress: false
+
+jobs:
+  rollup:
+    # A failed update has nothing new to aggregate, and re-running the rollup
+    # over unchanged Parquet would only add an empty commit.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: DuckDB
+        run: pip install --quiet duckdb
+
+      - name: Aggregate the Parquet
+        run: python derived/build_price_decade_rollup.py
+
+      # The product is arithmetic over the Parquet, so if the Parquet has not
+      # moved neither has this. A run that changes nothing should say so and
+      # leave no trace.
+      - name: Commit only if it changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- derived/price-decade-rollup.json; then
+            echo "the rollup is unchanged; nothing to commit"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add derived/price-decade-rollup.json
+          SPAN=$(python -c "import json;d=json.load(open('derived/price-decade-rollup.json'));print('-'.join(d['price']['span']))")
+          DAYS=$(python -c "import json;d=json.load(open('derived/price-decade-rollup.json'));print(d['derived_from']['complete_days'])")
+          git commit -m "Refresh the price decade rollup: ${SPAN}, ${DAYS} complete days
+
+          Derived from the Parquet in this repository by
+          derived/build_price_decade_rollup.py. Arithmetic aggregates only."
+          git push
