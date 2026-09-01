@@ -10,17 +10,17 @@ import urllib.request
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterable
-from zoneinfo import ZoneInfo
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+
+from gb_calendar import london_midnight_utc, london_today
 
 FUELINST_URL = "https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELINST"
 FUELHH_URL = "https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELHH"
 SYSTEM_PRICE_URL = "https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/system-prices"
 USER_AGENT = "GlobalGrid2050 data-gb-electricity monthly parquet updater"
 UTC = dt.timezone.utc
-LONDON = ZoneInfo("Europe/London")
 
 GROUPS = {
     "Solar": ["SOLAR", "PV"],
@@ -53,8 +53,10 @@ SCHEMAS = {
     ]),
     "prices": pa.schema([
         ("source", pa.string()),
-        ("settlementDate", pa.string()),
-        ("settlementPeriod", pa.int32()),
+        # These two types are the 456-file historical baseline produced by the
+        # DuckDB backfill. New months must not introduce a second schema.
+        ("settlementDate", pa.date32()),
+        ("settlementPeriod", pa.int64()),
         ("periodStartUTC", pa.timestamp("us", tz="UTC")),
         ("systemBuyPriceGBPperMWh", pa.float64()),
         ("systemSellPriceGBPperMWh", pa.float64()),
@@ -158,7 +160,7 @@ def days_between(start: dt.date, end: dt.date) -> Iterable[dt.date]:
 
 
 def default_previous_month() -> tuple[dt.date, dt.date]:
-    today = dt.datetime.now(LONDON).date()
+    today = london_today()
     first_this_month = dt.date(today.year, today.month, 1)
     last_prev_month = first_this_month - dt.timedelta(days=1)
     first_prev_month = dt.date(last_prev_month.year, last_prev_month.month, 1)
@@ -180,10 +182,8 @@ def period_start_from_date_period(date_text: str, period: int | None) -> dt.date
         settlement_date = dt.date.fromisoformat(str(date_text)[:10])
     except Exception:
         return None
-    local_start = dt.datetime.combine(settlement_date, dt.time(0, 0), tzinfo=LONDON)
-    local_next = local_start + dt.timedelta(days=1)
-    utc_start = local_start.astimezone(UTC)
-    utc_next = local_next.astimezone(UTC)
+    utc_start = london_midnight_utc(settlement_date)
+    utc_next = london_midnight_utc(settlement_date + dt.timedelta(days=1))
     periods = int((utc_next - utc_start).total_seconds() // 1800)
     if period < 1 or period > periods:
         return None
@@ -218,12 +218,35 @@ def read_parquet_file(path: Path) -> pa.Table:
     return pq.ParquetFile(path).read()
 
 
+def table_records(dataset: str, table: pa.Table) -> list[dict[str, Any]]:
+    """Convert a table without asking PyArrow to resolve an IANA timezone.
+
+    PyArrow's normal ``to_pylist`` path asks Python for the zone named in a
+    timestamp field. Linux runners ship that database; stock Python on Windows
+    does not. The schema stores UTC microseconds, so reconstructing those two
+    timestamp fields from their integers is exact and dependency-free.
+    """
+    columns: dict[str, list[Any]] = {}
+    epoch = dt.datetime(1970, 1, 1, tzinfo=UTC)
+    for field in SCHEMAS[dataset]:
+        column = table[field.name]
+        if pa.types.is_timestamp(field.type):
+            raw = column.cast(pa.int64()).to_pylist()
+            columns[field.name] = [None if value is None else epoch + dt.timedelta(microseconds=value) for value in raw]
+        else:
+            columns[field.name] = column.to_pylist()
+    return [
+        {field.name: columns[field.name][index] for field in SCHEMAS[dataset]}
+        for index in range(table.num_rows)
+    ]
+
+
 def read_existing(dataset: str, path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     table = read_parquet_file(path)
-    fields = [field.name for field in SCHEMAS[dataset]]
-    return [{field: row.get(field) for field in fields} for row in table.to_pylist()]
+    validate_table_schema(dataset, table, f"{path} existing read")
+    return table_records(dataset, table)
 
 
 def validate_rows(dataset: str, rows: list[dict[str, Any]], context: str) -> dict[str, int]:
@@ -251,7 +274,14 @@ def validate_table_schema(dataset: str, table: pa.Table, context: str) -> None:
         raise RuntimeError(f"{dataset} {context}: schema drift. expected={expected} got={table.schema}")
 
 
-def write_records(dataset: str, records: list[dict[str, Any]], apply: bool) -> dict[str, Any]:
+def write_records(
+    dataset: str,
+    records: list[dict[str, Any]],
+    apply: bool,
+    *,
+    replace_existing: bool = False,
+    refuse_existing: bool = False,
+) -> dict[str, Any]:
     by_month: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
     for row in records:
         ts = row.get("periodStartUTC") if dataset in {"fuelinst", "prices"} else row.get("time")
@@ -262,7 +292,13 @@ def write_records(dataset: str, records: list[dict[str, Any]], apply: bool) -> d
     report: dict[str, Any] = {"dataset": dataset, "apply": apply, "rowsFetched": len(records), "monthsTouched": 0, "partitions": []}
     for (year, month), new_rows in sorted(by_month.items()):
         path = partition_file(dataset, year, month)
-        existing_rows = read_existing(dataset, path)
+        existing_files = sorted(path.parent.glob("*.parquet"))
+        if refuse_existing and existing_files:
+            raise RuntimeError(
+                f"{dataset} {year}-{month:02d}: partition appeared after planning; "
+                "refusing to overwrite frozen history"
+            )
+        existing_rows = [] if replace_existing else read_existing(dataset, path)
         merged: dict[tuple[str, str], dict[str, Any]] = {}
         dropped_null_key_rows = 0
         for row in existing_rows + new_rows:
@@ -282,16 +318,34 @@ def write_records(dataset: str, records: list[dict[str, Any]], apply: bool) -> d
             "duplicatesDropped": duplicates_dropped,
             "droppedNullKeyRows": dropped_null_key_rows,
             "validation": validation,
+            "writeMode": (
+                "replace-explicit-repair" if replace_existing
+                else "add-missing" if refuse_existing
+                else "merge"
+            ),
         }
         if apply:
             path.parent.mkdir(parents=True, exist_ok=True)
             table = pa.Table.from_pylist(final_rows, schema=SCHEMAS[dataset])
             validate_table_schema(dataset, table, f"{year}-{month:02d} pre-write")
-            pq.write_table(table, path, compression="zstd")
-            written = read_parquet_file(path)
-            validate_table_schema(dataset, written, f"{year}-{month:02d} readback")
-            readback_rows = [{field.name: row.get(field.name) for field in SCHEMAS[dataset]} for row in written.to_pylist()]
-            item["readbackValidation"] = validate_rows(dataset, readback_rows, f"{year}-{month:02d} readback")
+            pending = path.with_name("data_0.parquet.pending")
+            try:
+                pq.write_table(table, pending, compression="zstd")
+                written = read_parquet_file(pending)
+                validate_table_schema(dataset, written, f"{year}-{month:02d} pending readback")
+                readback_rows = table_records(dataset, written)
+                item["readbackValidation"] = validate_rows(dataset, readback_rows, f"{year}-{month:02d} pending readback")
+                pending.replace(path)
+            finally:
+                if pending.exists():
+                    pending.unlink()
+            stale_removed: list[str] = []
+            if replace_existing:
+                for stale in existing_files:
+                    if stale != path and stale.exists():
+                        stale.unlink()
+                        stale_removed.append(str(stale))
+            item["staleFilesRemovedAfterVerifiedReplacement"] = stale_removed
             item["bytes"] = path.stat().st_size
         report["monthsTouched"] += 1
         report["partitions"].append(item)
@@ -361,7 +415,7 @@ def fetch_prices(start: dt.date, end: dt.date, retries: int, delay: float) -> li
             period_start = source_period_start or period_start_from_date_period(date_text, sp)
             if period_start is None:
                 continue
-            out.append({"source": "Elexon BMRS System Prices", "settlementDate": date_text, "settlementPeriod": sp, "periodStartUTC": period_start, "systemBuyPriceGBPperMWh": as_float(pick(raw, ["systemBuyPrice", "sbp"] )), "systemSellPriceGBPperMWh": as_float(pick(raw, ["systemSellPrice", "ssp"] )), "netImbalanceVolumeMWh": as_float(pick(raw, ["netImbalanceVolume", "niv"] )), "fetchedAtUTC": fetched_at})
+            out.append({"source": "Elexon BMRS System Prices", "settlementDate": day, "settlementPeriod": sp, "periodStartUTC": period_start, "systemBuyPriceGBPperMWh": as_float(pick(raw, ["systemBuyPrice", "sbp"] )), "systemSellPriceGBPperMWh": as_float(pick(raw, ["systemSellPrice", "ssp"] )), "netImbalanceVolumeMWh": as_float(pick(raw, ["netImbalanceVolume", "niv"] )), "fetchedAtUTC": fetched_at})
         time.sleep(delay)
     return out
 
@@ -384,13 +438,19 @@ def main() -> int:
     parser.add_argument("--fuelhh-window-days", type=int, default=7)
     parser.add_argument("--retries", type=int, default=4)
     parser.add_argument("--request-delay-seconds", type=float, default=1.5)
-    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--apply", action="store_true", help="Disabled here: writes must go through fetch_latest_month.py and its growth gate.")
     args = parser.parse_args()
+
+    if args.apply:
+        raise SystemExit(
+            "direct API writes are disabled; use fetch_latest_month.py so partition, "
+            "row, file, byte and request limits are enforced"
+        )
 
     default_start, default_end = default_previous_month()
     start = dt.date.fromisoformat(args.start_date) if args.start_date else default_start
     end = dt.date.fromisoformat(args.end_date) if args.end_date else default_end
-    yesterday = dt.datetime.now(LONDON).date() - dt.timedelta(days=1)
+    yesterday = london_today() - dt.timedelta(days=1)
     end = min(end, yesterday)
     if start > end:
         raise SystemExit(f"empty date range after clamping: {start} to {end}")

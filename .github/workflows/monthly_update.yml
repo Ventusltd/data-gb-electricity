@@ -3,26 +3,31 @@ name: Monthly GB Electricity Parquet Update
 on:
   schedule:
     # Automatic monthly refresh: 06:17 UTC on the 2nd day of each month.
-    # The script fetches the previous complete calendar month plus trailing lookback by default.
+    # The script inspects the latest three closed months and fills gaps only.
     - cron: '17 6 2 * *'
   workflow_dispatch:
     inputs:
       start_date:
-        description: Optional repair/backfill start date YYYY-MM-DD. Leave blank for previous complete month.
+        description: Optional inspection/repair start date YYYY-MM-DD.
         required: false
         default: ''
       end_date:
-        description: Optional repair/backfill end date YYYY-MM-DD. Leave blank for previous complete month.
+        description: Optional inspection/repair end date YYYY-MM-DD.
         required: false
         default: ''
       refetch_months:
-        description: Recent complete months to re-fetch when dates are blank.
+        description: Recent complete months to inspect for missing partitions. Existing months stay frozen.
         required: false
         default: '3'
       datasets:
         description: Space-separated list from fuelinst fuelhh prices.
         required: false
         default: 'fuelinst fuelhh prices'
+      repair_existing:
+        description: Replace existing history. Requires explicit start and end dates and remains bounded.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -44,6 +49,13 @@ jobs:
       END_DATE: ${{ github.event.inputs.end_date || '' }}
       REFETCH_MONTHS: ${{ github.event.inputs.refetch_months || '3' }}
       DATASETS: ${{ github.event.inputs.datasets || 'fuelinst fuelhh prices' }}
+      REPAIR_EXISTING: ${{ github.event.inputs.repair_existing || 'false' }}
+      MAX_DATASET_MONTHS: '9'
+      MAX_NEW_ROWS: '2000000'
+      MAX_NEW_PARQUET_FILES: '9'
+      MAX_NEW_PARQUET_BYTES: '134217728'
+      MAX_API_REQUESTS: '200'
+      MAX_API_ATTEMPTS: '600'
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -64,24 +76,49 @@ jobs:
           python3 -m pip install duckdb pyarrow
           python3 -c "import duckdb, pyarrow; print('ok')"
 
-      - name: Build fetch arguments
-        id: fetch_args
+      - name: Prove bounded-growth policy
         run: |
           set -euo pipefail
-          ARGS="--apply --datasets ${DATASETS} --refetch-months ${REFETCH_MONTHS}"
-          if [ -n "${START_DATE}" ]; then
-            ARGS="${ARGS} --start-date ${START_DATE}"
-          fi
-          if [ -n "${END_DATE}" ]; then
-            ARGS="${ARGS} --end-date ${END_DATE}"
-          fi
-          echo "args=${ARGS}" >> "$GITHUB_OUTPUT"
-          echo "Using arguments: ${ARGS}"
+          python3 -m unittest discover -s tests -v
 
       - name: Fetch latest month and write Parquet
         run: |
           set -euo pipefail
-          python3 pipelines/fetch_latest_month.py ${{ steps.fetch_args.outputs.args }}
+          if ! [[ "${REFETCH_MONTHS}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "refetch_months must be a positive integer" >&2
+            exit 2
+          fi
+          read -r -a REQUESTED_DATASETS <<< "${DATASETS}"
+          for dataset in "${REQUESTED_DATASETS[@]}"; do
+            case "${dataset}" in
+              fuelinst|fuelhh|prices) ;;
+              *) echo "invalid dataset: ${dataset}" >&2; exit 2 ;;
+            esac
+          done
+          ARGS=(
+            --apply
+            --datasets "${REQUESTED_DATASETS[@]}"
+            --refetch-months "${REFETCH_MONTHS}"
+            --max-dataset-months "${MAX_DATASET_MONTHS}"
+            --max-new-rows "${MAX_NEW_ROWS}"
+            --max-new-parquet-bytes "${MAX_NEW_PARQUET_BYTES}"
+            --max-api-requests "${MAX_API_REQUESTS}"
+            --max-api-attempts "${MAX_API_ATTEMPTS}"
+          )
+          if [ -n "${START_DATE}" ]; then ARGS+=(--start-date "${START_DATE}"); fi
+          if [ -n "${END_DATE}" ]; then ARGS+=(--end-date "${END_DATE}"); fi
+          if [ "${REPAIR_EXISTING}" = "true" ]; then ARGS+=(--repair-existing); fi
+          printf 'fetch argument: %q\n' "${ARGS[@]}"
+          python3 pipelines/fetch_latest_month.py "${ARGS[@]}"
+
+      - name: Verify actual repository growth against the plan
+        run: |
+          set -euo pipefail
+          python3 pipelines/verify_bounded_growth.py \
+            --audit reports/fetch_latest_month_latest.json \
+            --base HEAD \
+            --max-new-parquet-files "${MAX_NEW_PARQUET_FILES}" \
+            --max-new-parquet-bytes "${MAX_NEW_PARQUET_BYTES}"
 
       - name: Print audit summary
         if: always()
@@ -100,10 +137,16 @@ jobs:
           path: |
             reports/latest_parquet_audit.json
             reports/fetch_latest_month_latest.json
+            reports/bounded_growth_gate_latest.json
 
       - name: Commit Parquet outputs
         run: |
           set -euo pipefail
+          CHANGED_PARQUET=$(python3 -c "import json; print(json.load(open('reports/bounded_growth_gate_latest.json'))['limits']['actualChangedParquetFiles'])")
+          if [ "${CHANGED_PARQUET}" = "0" ]; then
+            echo "The bounded plan produced no Parquet diff; audit artifact was uploaded, no repository commit needed."
+            exit 0
+          fi
           TARGET_MONTH=$(python3 - <<'PY'
           import json
           from pathlib import Path

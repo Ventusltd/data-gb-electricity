@@ -124,23 +124,30 @@ The first clean historical backfill is recorded in `CHANGELOG.md`. That clean ru
 
 The active monthly process is `pipelines/fetch_latest_month.py` plus `.github/workflows/monthly_update.yml`.
 
-The workflow is scheduled to run once per month and fetch the previous closed calendar month plus a trailing lookback by default.
+The workflow is scheduled to run once per month and inspect the latest three closed UTC partition months for missing dataset partitions.
 
 Default monthly behaviour:
 
 Run date: 2nd day of each month at 06:17 UTC.
 
-Date range fetched: previous complete calendar month plus the trailing refetch window.
+Date range inspected: the latest three complete UTC partition months after the corresponding GB calendar month has closed.
 
-Default trailing refetch: 3 recent complete months when dates are blank.
+Default write rule: fetch only missing dataset-months. Existing Parquet is frozen and causes no API request.
 
 Datasets: fuelinst, fuelhh and prices.
 
-Output: rewritten month Parquet partitions and reports.
+Output: at most one new `data_0.parquet` per missing dataset-month, plus moving audit reports.
 
 Commit: generation, prices and reports.
 
-Manual workflow_dispatch remains available for controlled testing, repair or explicit backfill ranges.
+Manual workflow_dispatch remains available for controlled testing. Replacing existing history requires explicit start and end dates plus the separate `repair_existing` switch.
+
+Hard unattended limits are 9 dataset-months, 2,000,000 fetched rows, 9
+Parquet files, 134,217,728 written Parquet bytes, 200 estimated logical API
+requests and 600 maximum HTTP attempts including retries.
+A second gate compares the audit plan with Git's real diff and rejects
+historical modification, an unplanned partition, raw data, or excess growth
+before commit. See `BOUNDED_MONTHLY_UPDATES.md`.
 
 Important status note:
 
@@ -154,15 +161,23 @@ Use one complete month already covered by the dataset.
 
 Run all three datasets.
 
-Confirm the touched partitions are rewritten.
+Confirm an existing partition is reported `SKIP_FROZEN` and remains byte-identical.
+
+Confirm a missing partition is reported `ADD_MISSING` and creates exactly one Parquet file.
 
 Confirm duplicate key groups remain zero.
 
-Confirm the audit report records the target month, removed partitions, row counts and Parquet audit.
+Confirm the audit records the plan, skip decisions, row counts, hard limits and before/after Parquet audit.
 
 ## Cleaning and merge discipline
 
-Every run fetches or reads the full touched calendar month, removes the existing touched partition, deduplicates records by stable key, and writes the month partition fresh.
+Normal runs never remove or rewrite an existing calendar-month partition. They
+fetch a full missing dataset-month, deduplicate by stable key, validate schema
+and key uniqueness, write a pending Parquet file, read it back, and only then
+install `data_0.parquet`.
+
+Historical replacement is a distinct explicit-repair mode. It is date-bounded,
+uses the same limits and records the replacement in the audit.
 
 FUELINST key: periodStartUTC plus fuelType.
 
@@ -179,6 +194,8 @@ The main audit reports are:
 reports/latest_parquet_audit.json
 
 reports/fetch_latest_month_latest.json
+
+reports/bounded_growth_gate_latest.json
 
 reports/package_verification_summary.json
 
@@ -235,7 +252,9 @@ No app code here.
 
 No source repo clone committed here.
 
-Monthly automation fetches only the previous complete month unless an explicit repair range is provided.
+Monthly automation inspects only recent complete months and fetches missing
+dataset-months. Existing history is not queried or changed unless an explicit
+bounded repair range is provided.
 
 Failed API calls, empty results, duplicate keys, schema problems or canary corruption must make the workflow go red.
 

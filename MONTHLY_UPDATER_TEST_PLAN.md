@@ -1,89 +1,77 @@
-# Monthly Updater Test Plan
+# Monthly updater proof plan
 
-Purpose: prove the monthly updater end to end before trusting the unattended schedule.
+Purpose: prove that unattended updates fill bounded gaps while preserving
+historic Parquet bytes.
 
-The historical backfill is now clean. The remaining open risk is the monthly updater, because it is the workflow intended to keep the dataset alive over time.
+## Local gates
 
-A README claim is not proof. A successful workflow run plus data-law verification is proof.
+Run on Windows and Linux:
 
-## Test target
+```text
+python -m unittest discover -s tests -v
+python pipelines/fetch_latest_month.py --plan-only --refetch-months 3
+```
 
-Use `.github/workflows/monthly_update.yml` through manual workflow_dispatch.
+The tests include diseased fixtures. They must show that a historical
+modification, unplanned partition, raw CSV and excess byte growth all make the
+repository-diff gate fail. The GB calendar fixtures must prove 46 settlement
+periods on the spring clock-change day and 50 on the autumn day without an
+external timezone package.
 
-Use `pipelines/fetch_latest_month.py` and `pipelines/fetch_elexon_api_to_parquet.py`.
+`--plan-only` must make no network call and no write. Inspect every
+dataset-month decision before enabling a live fetch.
 
-Run one controlled complete month first.
+## First controlled GitHub Actions run
 
-Suggested test month: choose a month already present in the clean backfill and known to be complete.
+Use `.github/workflows/monthly_update.yml` through `workflow_dispatch`.
 
-Datasets: fuelinst fuelhh prices.
+Choose an already present, complete month and leave `repair_existing` false.
+Expected result: all selected datasets say `SKIP_FROZEN`, no API request is
+made for them, no Parquet changes, and no data commit is created.
 
-## Workflow inputs
+Then choose one closed month with a genuinely missing dataset partition.
+Expected result: that dataset-month says `ADD_MISSING`; every existing selected
+partition says `SKIP_FROZEN`; exactly one `data_0.parquet` is added for each
+missing dataset-month.
 
-start_date: first day of the chosen complete month.
+## Required evidence
 
-end_date: last day of the chosen complete month.
+The workflow must be green, but green alone is insufficient. Retain both:
 
-refetch_months: 1.
+- `reports/fetch_latest_month_latest.json`, which records the selection plan,
+  row counts, limits, schema/key checks and before/after package size;
+- `reports/bounded_growth_gate_latest.json`, which records the actual Git diff
+  and proves it matches the plan.
 
-datasets: fuelinst fuelhh prices.
+For every written partition verify the declared data law:
 
-## Expected behaviour
+- FUELINST: rows equal distinct `periodStartUTC` plus `fuelType`;
+- FUELHH: rows equal distinct `time` plus `technology`;
+- prices: rows equal distinct `periodStartUTC`.
 
-The workflow should fetch all three datasets for the target month.
+Verify tracked historical Parquet outside the plan is byte-identical to the
+parent commit. Verify no raw CSV, API response dump or timestamped audit archive
+was added.
 
-The workflow should remove the touched month partition directories before rewriting.
+## Explicit repair proof
 
-The workflow should write fresh Parquet files for the touched month.
+Only after normal mode passes, run one known complete month with explicit
+`start_date`, `end_date` and `repair_existing=true`.
 
-The workflow should write reports/latest_parquet_audit.json.
-
-The workflow should write reports/fetch_latest_month_latest.json.
-
-The workflow should commit generation, prices and reports only if the run succeeds.
-
-## Required verification after run
-
-Verify FUELINST duplicate key groups are zero for the touched month.
-
-Verify FUELHH duplicate key groups are zero for the touched month.
-
-Verify prices duplicate key groups are zero for the touched month.
-
-Verify the audit report records the target month.
-
-Verify the audit report records removedPartitionsBeforeRewrite.
-
-Verify the audit report records idempotency keys.
-
-Verify the commit changed only the expected month partitions and reports.
-
-## Proof standard
-
-A green workflow is not enough.
-
-The test passes only if the workflow is green and the touched Parquet data passes the declared key uniqueness laws.
-
-For FUELINST: total rows must equal distinct periodStartUTC plus fuelType.
-
-For FUELHH: total rows must equal distinct time plus technology.
-
-For prices: total rows must equal distinct periodStartUTC.
+The audit must say `EXPLICIT_REPAIR`. Only selected dataset-month directories
+may change. Replacement `data_0.parquet` must pass pending-file readback before
+the old file is replaced. Any stale `data_N.parquet` shard may be removed only
+inside that authorised partition and only after readback succeeds.
 
 ## Failure handling
 
-If the workflow fails, do not patch broadly.
-
-Capture the exact failed step and exact log line.
-
-Patch only that layer.
-
-Rerun the same controlled month.
-
-Record the result in CHANGELOG.md.
+Do not raise a growth limit to make a surprising run green. Preserve the audit
+artifact, identify whether the source expanded legitimately or the query scope
+escaped, and change one layer at a time. A limit change is a reviewed code
+change, never a workflow input.
 
 ## Status
 
-Pending.
-
-The monthly updater should be treated as implemented but not yet proven until this plan has been run and recorded.
+Local policy, DST, atomic-write and diseased growth-gate fixtures pass. The
+first controlled GitHub `workflow_dispatch` remains required before the
+schedule should be considered production-proven.

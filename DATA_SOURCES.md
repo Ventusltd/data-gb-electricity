@@ -28,7 +28,20 @@ Forward monthly pathway:
 
 New or repaired months are fetched from Elexon API endpoints.
 
-That pathway is implemented by `.github/workflows/monthly_update.yml`, `pipelines/fetch_latest_month.py` and helper logic in `pipelines/fetch_elexon_api_to_parquet.py`.
+That pathway is implemented by `.github/workflows/monthly_update.yml`,
+`pipelines/fetch_latest_month.py` and helper logic in
+`pipelines/fetch_elexon_api_to_parquet_hardened.py`.
+
+Normal runs query only missing closed dataset-months. Existing month
+partitions are frozen. An existing partition can be replaced only by an
+explicit date-bounded repair, and both modes are limited by dataset-month,
+row, file, byte and API-request budgets. `pipelines/verify_bounded_growth.py` compares the
+declared plan with Git's actual diff before CI may commit it.
+
+Parquet directories use the UTC timestamp's year and month, matching the
+historical backfill. FUELHH and system-price endpoints are addressed by GB
+settlement date, so the collector requests one boundary day on each side and
+filters the response back to the authorised UTC partition before writing.
 
 The monthly updater should be treated as unproven until a controlled workflow_dispatch run is completed, audited and recorded in `CHANGELOG.md`.
 
@@ -58,7 +71,9 @@ Cleaning rule:
 
 Rows are normalised to source, periodStartUTC, fuelType, generationMW, publishTimeUTC, fetchedAtUTC and dataset.
 
-Re-runs overwrite matching periodStartUTC plus fuelType rows rather than appending duplicates.
+Normal re-runs skip an existing month. An explicit repair replaces the full
+month after uniqueness and readback verification rather than appending
+duplicates.
 
 ## Source 2 — FUELHH generation
 
@@ -108,7 +123,9 @@ Imports and Exports: INT.
 
 Other: fallback bucket.
 
-Re-runs overwrite matching time plus technology rows rather than appending duplicates.
+Normal re-runs skip an existing month. An explicit repair replaces the full
+month after uniqueness and readback verification rather than appending
+duplicates.
 
 ## Source 3 — Elexon system prices
 
@@ -136,7 +153,9 @@ Cleaning rule:
 
 Rows are normalised to source, settlementDate, settlementPeriod, periodStartUTC, systemBuyPriceGBPperMWh, systemSellPriceGBPperMWh, netImbalanceVolumeMWh and fetchedAtUTC.
 
-Re-runs overwrite matching periodStartUTC rows rather than appending duplicates.
+Normal re-runs skip an existing month. An explicit repair replaces the full
+month after uniqueness and readback verification rather than appending
+duplicates.
 
 ## Historical CSV transition notes
 
@@ -184,9 +203,11 @@ Workflow: `.github/workflows/monthly_update.yml`.
 
 Monthly script: `pipelines/fetch_latest_month.py`.
 
-API helper script: `pipelines/fetch_elexon_api_to_parquet.py`.
+API helper script: `pipelines/fetch_elexon_api_to_parquet_hardened.py`.
 
-The monthly workflow runs once per month and can also be triggered manually for a controlled repair range.
+The monthly workflow runs once per month, fills bounded gaps in recent closed
+months, and can also be triggered manually for a controlled explicit repair
+range.
 
 ## Reports
 
@@ -197,6 +218,8 @@ reports/latest_parquet_audit.json
 reports/fetch_latest_month_latest.json
 
 reports/package_verification_summary.json
+
+reports/bounded_growth_gate_latest.json
 
 The audit reports should log date range, datasets, endpoint names or source files, idempotency keys, rows fetched or converted, duplicate-key outcomes and partitions touched.
 

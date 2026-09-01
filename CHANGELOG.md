@@ -4,6 +4,37 @@ Plain-language project change log for `data-gb-electricity`. Newest entries firs
 
 ---
 
+## 2026-09-01 — Monthly growth made bounded and history-preserving
+
+The scheduled updater no longer deletes and rewrites three recent months on
+every run. It inspects them and fetches only missing dataset-month partitions.
+Existing Parquet is frozen unless an operator supplies an explicit date range
+and separately enables repair mode.
+
+Hard limits now cover dataset-months, fetched rows, Parquet files, Parquet
+bytes and estimated API requests. All responses are collected and validated
+before the first write. GB settlement-date endpoints receive a boundary buffer,
+then only rows in the authorised UTC partition month are retained.
+
+A second gate compares the audit plan with Git's actual diff. It fails on a
+normal historical modification, an unplanned partition, raw data, or excessive
+growth before CI may commit anything. Twenty-one local fixtures include diseased
+cases for each of those failures, atomic Parquet readback, concurrent partition
+appearance, and the 46/50-period GB clock-change days.
+
+All 456 checked-in Parquet files are also schema canaries. The audit caught and
+corrected the unproven helper's price-schema drift before a new month was
+written: the established package uses `date32` settlement dates and `int64`
+settlement periods.
+
+The direct helper's write switch is disabled so it cannot bypass these limits.
+The one-time full backfill now requires an explicit confirmation phrase.
+
+The first controlled workflow dispatch remains required before the unattended
+schedule is considered production-proven.
+
+---
+
 ## 2026-06-29 — First clean historical backfill verified
 
 The corrected historical backfill has run and landed clean data on main.

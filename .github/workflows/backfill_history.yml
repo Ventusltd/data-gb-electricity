@@ -2,12 +2,18 @@ name: Historical GB Electricity Parquet Backfill
 
 on:
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type REBUILD_FROZEN_HISTORY to run the one-time full historical pathway.
+        required: true
+        default: ''
 
 permissions:
   contents: write
 
 jobs:
   backfill:
+    if: github.event.inputs.confirmation == 'REBUILD_FROZEN_HISTORY'
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
