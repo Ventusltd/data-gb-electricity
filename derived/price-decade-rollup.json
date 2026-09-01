@@ -1,12 +1,12 @@
 {
-  "schema": "data-gb-electricity.price-decade-rollup.v1",
-  "what_this_is": "Yearly aggregates of the GB system sell price, derived from the Parquet in this repository so that a browser can carry the decade without carrying the settlement periods. Arithmetic aggregates only: no resampling, smoothing, modelling or forecasting.",
+  "schema": "data-gb-electricity.price-decade-rollup.v2",
+  "what_this_is": "Yearly aggregates of the available GB system sell-price record, derived from the Parquet in this repository so that a browser can carry the history without carrying the settlement periods. Arithmetic aggregates only: no resampling, smoothing, modelling or forecasting.",
   "not_a_forecast": "Historic system conditions. Not a projection, not a price expectation, and not a statement about the economics of any project or asset.",
   "grain": {
     "source_grain": "half-hourly settlement period",
     "product_grain": "calendar year, over daily means",
     "minimum_periods_per_day": 24,
-    "note": "a day below the minimum is excluded rather than averaged, so the day counts below are complete days"
+    "note": "a date with fewer than the minimum available periods is excluded rather than averaged. A retained date is included, not necessarily complete; calendar-date coverage is carried for every year"
   },
   "derived_from": {
     "repository": "Ventusltd/data-gb-electricity",
@@ -14,6 +14,8 @@
     "field": "systemSellPriceGBPperMWh",
     "upstream": "Elexon",
     "settlement_periods": 161064,
+    "settlement_periods_on_included_dates": 155082,
+    "included_days": 3339,
     "complete_days": 3339
   },
   "solar": {
@@ -26,104 +28,165 @@
       "2016",
       "2026"
     ],
+    "available_record_daily_mean": 78.18,
     "decade_mean": 78.18,
     "lowest_settlement_period": {
       "value": -185.33,
-      "date": "2023-07-17"
+      "date": "2023-07-17",
+      "settlement_period": 29,
+      "period_start_utc": "2023-07-17T14:00:00Z"
     },
     "highest_settlement_period": {
       "value": 4037.8,
-      "date": "2021-09-09"
+      "date": "2021-09-09",
+      "settlement_period": 33,
+      "period_start_utc": "2021-09-09T16:00:00Z"
     },
     "days_with_a_negative_settlement_period": 580,
+    "negative_period_day_share_pct": 17.37,
     "by_year": [
       {
         "year": "2016",
         "days": 366,
+        "days_included": 366,
+        "calendar_days": 366,
+        "calendar_date_coverage_pct": 100.0,
+        "calendar_date_coverage": "FULL_DATE_COVERAGE",
         "mean_gbp_per_mwh": 39.38,
         "min_daily_mean": 2.95,
         "max_daily_mean": 226.9,
-        "days_with_a_negative_settlement_period": 47
+        "days_with_a_negative_settlement_period": 47,
+        "negative_period_day_share_pct": 12.84
       },
       {
         "year": "2017",
         "days": 365,
+        "days_included": 365,
+        "calendar_days": 365,
+        "calendar_date_coverage_pct": 100.0,
+        "calendar_date_coverage": "FULL_DATE_COVERAGE",
         "mean_gbp_per_mwh": 44.28,
         "min_daily_mean": 4.72,
         "max_daily_mean": 177.84,
-        "days_with_a_negative_settlement_period": 19
+        "days_with_a_negative_settlement_period": 19,
+        "negative_period_day_share_pct": 5.21
       },
       {
         "year": "2018",
         "days": 276,
+        "days_included": 276,
+        "calendar_days": 365,
+        "calendar_date_coverage_pct": 75.62,
+        "calendar_date_coverage": "PARTIAL_DATE_COVERAGE",
         "mean_gbp_per_mwh": 56.36,
         "min_daily_mean": 28.51,
         "max_daily_mean": 281.61,
-        "days_with_a_negative_settlement_period": 30
+        "days_with_a_negative_settlement_period": 30,
+        "negative_period_day_share_pct": 10.87
       },
       {
         "year": "2019",
         "days": 365,
+        "days_included": 365,
+        "calendar_days": 365,
+        "calendar_date_coverage_pct": 100.0,
+        "calendar_date_coverage": "FULL_DATE_COVERAGE",
         "mean_gbp_per_mwh": 42.0,
         "min_daily_mean": -12.16,
         "max_daily_mean": 82.46,
-        "days_with_a_negative_settlement_period": 30
+        "days_with_a_negative_settlement_period": 30,
+        "negative_period_day_share_pct": 8.22
       },
       {
         "year": "2020",
         "days": 366,
+        "days_included": 366,
+        "calendar_days": 366,
+        "calendar_date_coverage_pct": 100.0,
+        "calendar_date_coverage": "FULL_DATE_COVERAGE",
         "mean_gbp_per_mwh": 35.12,
         "min_daily_mean": -16.91,
         "max_daily_mean": 122.89,
-        "days_with_a_negative_settlement_period": 52
+        "days_with_a_negative_settlement_period": 52,
+        "negative_period_day_share_pct": 14.21
       },
       {
         "year": "2021",
         "days": 214,
+        "days_included": 214,
+        "calendar_days": 365,
+        "calendar_date_coverage_pct": 58.63,
+        "calendar_date_coverage": "PARTIAL_DATE_COVERAGE",
         "mean_gbp_per_mwh": 127.68,
         "min_daily_mean": 29.05,
         "max_daily_mean": 960.24,
-        "days_with_a_negative_settlement_period": 26
+        "days_with_a_negative_settlement_period": 26,
+        "negative_period_day_share_pct": 12.15
       },
       {
         "year": "2022",
         "days": 365,
+        "days_included": 365,
+        "calendar_days": 365,
+        "calendar_date_coverage_pct": 100.0,
+        "calendar_date_coverage": "FULL_DATE_COVERAGE",
         "mean_gbp_per_mwh": 200.07,
         "min_daily_mean": 7.87,
         "max_daily_mean": 777.9,
-        "days_with_a_negative_settlement_period": 58
+        "days_with_a_negative_settlement_period": 58,
+        "negative_period_day_share_pct": 15.89
       },
       {
         "year": "2023",
         "days": 365,
+        "days_included": 365,
+        "calendar_days": 365,
+        "calendar_date_coverage_pct": 100.0,
+        "calendar_date_coverage": "FULL_DATE_COVERAGE",
         "mean_gbp_per_mwh": 94.59,
         "min_daily_mean": -9.34,
         "max_daily_mean": 238.12,
-        "days_with_a_negative_settlement_period": 109
+        "days_with_a_negative_settlement_period": 109,
+        "negative_period_day_share_pct": 29.86
       },
       {
         "year": "2024",
         "days": 366,
+        "days_included": 366,
+        "calendar_days": 366,
+        "calendar_date_coverage_pct": 100.0,
+        "calendar_date_coverage": "FULL_DATE_COVERAGE",
         "mean_gbp_per_mwh": 71.0,
         "min_daily_mean": -3.52,
         "max_daily_mean": 179.29,
-        "days_with_a_negative_settlement_period": 123
+        "days_with_a_negative_settlement_period": 123,
+        "negative_period_day_share_pct": 33.61
       },
       {
         "year": "2025",
         "days": 123,
+        "days_included": 123,
+        "calendar_days": 365,
+        "calendar_date_coverage_pct": 33.7,
+        "calendar_date_coverage": "PARTIAL_DATE_COVERAGE",
         "mean_gbp_per_mwh": 84.77,
         "min_daily_mean": 4.55,
         "max_daily_mean": 696.2,
-        "days_with_a_negative_settlement_period": 45
+        "days_with_a_negative_settlement_period": 45,
+        "negative_period_day_share_pct": 36.59
       },
       {
         "year": "2026",
         "days": 168,
+        "days_included": 168,
+        "calendar_days": 365,
+        "calendar_date_coverage_pct": 46.03,
+        "calendar_date_coverage": "PARTIAL_DATE_COVERAGE",
         "mean_gbp_per_mwh": 91.97,
         "min_daily_mean": -2.08,
         "max_daily_mean": 149.16,
-        "days_with_a_negative_settlement_period": 41
+        "days_with_a_negative_settlement_period": 41,
+        "negative_period_day_share_pct": 24.4
       }
     ]
   }

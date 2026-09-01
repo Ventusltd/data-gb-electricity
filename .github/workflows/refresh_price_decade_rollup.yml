@@ -22,7 +22,7 @@
 # It runs after monthly_update, not on a guessed clock: workflow_run means it
 # fires when there is actually something new to aggregate, and never otherwise.
 
-name: Refresh the price decade rollup
+name: Refresh the available-record price rollup
 
 on:
   workflow_dispatch:
@@ -33,6 +33,7 @@ on:
     branches: [main]
     paths:
       - 'derived/build_price_decade_rollup.py'
+      - 'derived/verify_price_decade_rollup.py'
       - '.github/workflows/refresh_price_decade_rollup.yml'
 
 permissions:
@@ -62,7 +63,9 @@ jobs:
         run: pip install --quiet duckdb
 
       - name: Aggregate the Parquet
-        run: python derived/build_price_decade_rollup.py
+        run: |
+          python derived/build_price_decade_rollup.py
+          python derived/verify_price_decade_rollup.py
 
       # The product is arithmetic over the Parquet, so if the Parquet has not
       # moved neither has this. A run that changes nothing should say so and
@@ -78,8 +81,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add derived/price-decade-rollup.json
           SPAN=$(python -c "import json;d=json.load(open('derived/price-decade-rollup.json'));print('-'.join(d['price']['span']))")
-          DAYS=$(python -c "import json;d=json.load(open('derived/price-decade-rollup.json'));print(d['derived_from']['complete_days'])")
-          git commit -m "Refresh the price decade rollup: ${SPAN}, ${DAYS} complete days
+          DAYS=$(python -c "import json;d=json.load(open('derived/price-decade-rollup.json'));print(d['derived_from']['included_days'])")
+          git commit -m "Refresh the price decade rollup: ${SPAN}, ${DAYS} included days
 
           Derived from the Parquet in this repository by
           derived/build_price_decade_rollup.py. Arithmetic aggregates only."
