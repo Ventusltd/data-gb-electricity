@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "data-gb-electricity.bounded-growth-gate.v1",
+  "status": "PASS",
+  "mode": "FILL_MISSING",
+  "limits": {
+    "maxNewParquetFiles": 9,
+    "maxNewParquetBytes": 134217728,
+    "actualWrittenParquetFiles": 7,
+    "actualChangedParquetFiles": 7,
+    "actualWrittenParquetBytes": 966663
+  },
+  "changedParquet": [
+    {
+      "status": "A",
+      "path": "generation/dataset=fuelhh/year=2026/month=6/data_0.parquet",
+      "bytes": 43453,
+      "action": "ADD_MISSING"
+    },
+    {
+      "status": "A",
+      "path": "generation/dataset=fuelhh/year=2026/month=7/data_0.parquet",
+      "bytes": 43724,
+      "action": "ADD_MISSING"
+    },
+    {
+      "status": "A",
+      "path": "generation/dataset=fuelhh/year=2026/month=8/data_0.parquet",
+      "bytes": 44507,
+      "action": "ADD_MISSING"
+    },
+    {
+      "status": "A",
+      "path": "generation/dataset=fuelinst/year=2026/month=7/data_0.parquet",
+      "bytes": 377385,
+      "action": "ADD_MISSING"
+    },
+    {
+      "status": "A",
+      "path": "generation/dataset=fuelinst/year=2026/month=8/data_0.parquet",
+      "bytes": 383636,
+      "action": "ADD_MISSING"
+    },
+    {
+      "status": "A",
+      "path": "prices/year=2026/month=7/data_0.parquet",
+      "bytes": 37136,
+      "action": "ADD_MISSING"
+    },
+    {
+      "status": "A",
+      "path": "prices/year=2026/month=8/data_0.parquet",
+      "bytes": 36822,
+      "action": "ADD_MISSING"
+    }
+  ],
+  "errors": []
+}
