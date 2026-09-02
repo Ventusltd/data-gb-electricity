@@ -13,10 +13,10 @@
     "path": "prices/year=*/month=*/data_0.parquet",
     "field": "systemSellPriceGBPperMWh",
     "upstream": "Elexon",
-    "settlement_periods": 161064,
-    "settlement_periods_on_included_dates": 155082,
-    "included_days": 3339,
-    "complete_days": 3339
+    "settlement_periods": 164040,
+    "settlement_periods_on_included_dates": 158056,
+    "included_days": 3401,
+    "complete_days": 3401
   },
   "solar": {
     "present": false,
@@ -28,8 +28,8 @@
       "2016",
       "2026"
     ],
-    "available_record_daily_mean": 78.18,
-    "decade_mean": 78.18,
+    "available_record_daily_mean": 78.91,
+    "decade_mean": 78.91,
     "lowest_settlement_period": {
       "value": -185.33,
       "date": "2023-07-17",
@@ -42,8 +42,8 @@
       "settlement_period": 33,
       "period_start_utc": "2021-09-09T16:00:00Z"
     },
-    "days_with_a_negative_settlement_period": 580,
-    "negative_period_day_share_pct": 17.37,
+    "days_with_a_negative_settlement_period": 596,
+    "negative_period_day_share_pct": 17.52,
     "by_year": [
       {
         "year": "2016",
@@ -177,16 +177,16 @@
       },
       {
         "year": "2026",
-        "days": 168,
-        "days_included": 168,
+        "days": 230,
+        "days_included": 230,
         "calendar_days": 365,
-        "calendar_date_coverage_pct": 46.03,
+        "calendar_date_coverage_pct": 63.01,
         "calendar_date_coverage": "PARTIAL_DATE_COVERAGE",
-        "mean_gbp_per_mwh": 91.97,
+        "mean_gbp_per_mwh": 99.09,
         "min_daily_mean": -2.08,
-        "max_daily_mean": 149.16,
-        "days_with_a_negative_settlement_period": 41,
-        "negative_period_day_share_pct": 24.4
+        "max_daily_mean": 178.94,
+        "days_with_a_negative_settlement_period": 57,
+        "negative_period_day_share_pct": 24.78
       }
     ]
   }
