@@ -3,6 +3,7 @@
 import calendar
 import json
 import os
+from build_price_decade_rollup import price_input_glob, require_price_grain
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -69,9 +70,12 @@ def main():
     # Re-read the owner Parquet. Shape-only tests would bless a self-consistent
     # lie if both the product and its builder drifted together.
     import duckdb
-    parquet_glob = os.path.join(REPO, "prices", "year=*", "month=*",
-                                "data_0.parquet").replace("\\", "/")
+    parquet_glob = price_input_glob(REPO)
     connection = duckdb.connect()
+    actual_grain = require_price_grain(connection, parquet_glob)
+    assert product["derived_from"]["path"] == "prices/year=*/month=*/data_*.parquet"
+    assert product["derived_from"]["source_key"] == "periodStartUTC"
+    assert product["derived_from"]["input_grain"] == actual_grain
     source_periods = connection.execute(
         "SELECT count(*) FROM read_parquet(?) "
         "WHERE systemSellPriceGBPperMWh IS NOT NULL", [parquet_glob]).fetchone()[0]

@@ -4,6 +4,32 @@ Plain-language project change log for `data-gb-electricity`. Newest entries firs
 
 ---
 
+## 2026-11-16 — Include every physical price part in the available-record rollup
+
+The derived product and its verifier used `data_0.parquet` only, although valid
+monthly partitions can contain `data_1`, `data_2` and later physical parts. An
+independent full-file audit found 186,342 unique periods in 186 price files,
+while the old rollup read only 164,040. The 22,302 omitted periods were not
+duplicates. The source Parquet history is unchanged.
+
+Both derivation and verification now read all `data_*.parquet` parts. Before
+aggregation they require one non-null UTC period key per row and reject
+nonfinite reported sell prices. The product records this input grain. The
+existing inclusion/coverage rules and explicit historical/not-a-forecast scope
+remain unchanged.
+
+The rebuilt current-source product has 186,342 price periods and 3,883 included
+dates, compared with 164,040 and 3,401 before the correction. Its negative-period
+day count is 719 rather than 596. These are observations for this source commit,
+not permanent cardinality targets. Four synthetic regressions cover split-part
+daily inclusion and duplicate/null-key/nonfinite rows before output replacement.
+
+The owner separately authorized re-enabling the existing monthly and rollup
+workflows. This correction creates no workflow, dispatches no refresh and
+rewrites no historical partition.
+
+---
+
 ## 2026-09-01 — Monthly growth made bounded and history-preserving
 
 The scheduled updater no longer deletes and rewrites three recent months on
