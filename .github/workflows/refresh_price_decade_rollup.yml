@@ -34,6 +34,8 @@ on:
     paths:
       - 'derived/build_price_decade_rollup.py'
       - 'derived/verify_price_decade_rollup.py'
+      - 'derived/price_daily_browser.py'
+      - 'pipelines/gb_calendar.py'
       - '.github/workflows/refresh_price_decade_rollup.yml'
   pull_request:
     paths:
@@ -69,6 +71,7 @@ jobs:
           python -B derived/build_price_decade_rollup.py
           python -B derived/verify_price_decade_rollup.py
           git diff --exit-code -- derived/price-decade-rollup.json
+          python -B derived/price_daily_browser.py --verify
 
   rollup:
     # A failed update has nothing new to aggregate, and re-running the rollup
@@ -87,12 +90,14 @@ jobs:
           python-version: '3.12'
 
       - name: DuckDB
-        run: pip install --quiet duckdb
+        run: pip install --quiet duckdb==1.3.2
 
       - name: Aggregate the Parquet
         run: |
           python derived/build_price_decade_rollup.py
           python derived/verify_price_decade_rollup.py
+          python -B derived/price_daily_browser.py
+          python -B derived/price_daily_browser.py --verify
 
       # The product is arithmetic over the Parquet, so if the Parquet has not
       # moved neither has this. A run that changes nothing should say so and
@@ -100,17 +105,18 @@ jobs:
       - name: Commit only if it changed
         run: |
           set -euo pipefail
-          if git diff --quiet -- derived/price-decade-rollup.json; then
-            echo "the rollup is unchanged; nothing to commit"
+          git add -- derived/price-decade-rollup.json derived/price-daily-browser
+          if git diff --cached --quiet -- derived/price-decade-rollup.json derived/price-daily-browser; then
+            echo "the price products are unchanged; nothing to commit"
             exit 0
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add derived/price-decade-rollup.json
           SPAN=$(python -c "import json;d=json.load(open('derived/price-decade-rollup.json'));print('-'.join(d['price']['span']))")
           DAYS=$(python -c "import json;d=json.load(open('derived/price-decade-rollup.json'));print(d['derived_from']['included_days'])")
-          git commit -m "Refresh the price decade rollup: ${SPAN}, ${DAYS} included days
+          git commit -m "Refresh historical price products: ${SPAN}, ${DAYS} included rollup days
 
           Derived from the Parquet in this repository by
-          derived/build_price_decade_rollup.py. Arithmetic aggregates only."
+          derived/build_price_decade_rollup.py and derived/price_daily_browser.py.
+          Arithmetic aggregates only; raw history remains unchanged."
           git push
