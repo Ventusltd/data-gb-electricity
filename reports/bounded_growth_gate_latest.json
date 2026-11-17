@@ -5,51 +5,21 @@
   "limits": {
     "maxNewParquetFiles": 9,
     "maxNewParquetBytes": 134217728,
-    "actualWrittenParquetFiles": 7,
-    "actualChangedParquetFiles": 7,
-    "actualWrittenParquetBytes": 966663
+    "actualWrittenParquetFiles": 2,
+    "actualChangedParquetFiles": 2,
+    "actualWrittenParquetBytes": 73650
   },
   "changedParquet": [
     {
       "status": "A",
-      "path": "generation/dataset=fuelhh/year=2026/month=6/data_0.parquet",
-      "bytes": 43453,
+      "path": "prices/year=2026/month=10/data_0.parquet",
+      "bytes": 37297,
       "action": "ADD_MISSING"
     },
     {
       "status": "A",
-      "path": "generation/dataset=fuelhh/year=2026/month=7/data_0.parquet",
-      "bytes": 43724,
-      "action": "ADD_MISSING"
-    },
-    {
-      "status": "A",
-      "path": "generation/dataset=fuelhh/year=2026/month=8/data_0.parquet",
-      "bytes": 44507,
-      "action": "ADD_MISSING"
-    },
-    {
-      "status": "A",
-      "path": "generation/dataset=fuelinst/year=2026/month=7/data_0.parquet",
-      "bytes": 377385,
-      "action": "ADD_MISSING"
-    },
-    {
-      "status": "A",
-      "path": "generation/dataset=fuelinst/year=2026/month=8/data_0.parquet",
-      "bytes": 383636,
-      "action": "ADD_MISSING"
-    },
-    {
-      "status": "A",
-      "path": "prices/year=2026/month=7/data_0.parquet",
-      "bytes": 37136,
-      "action": "ADD_MISSING"
-    },
-    {
-      "status": "A",
-      "path": "prices/year=2026/month=8/data_0.parquet",
-      "bytes": 36822,
+      "path": "prices/year=2026/month=9/data_0.parquet",
+      "bytes": 36353,
       "action": "ADD_MISSING"
     }
   ],

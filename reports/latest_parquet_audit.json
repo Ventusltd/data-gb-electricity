@@ -1,169 +1,52 @@
 {
   "schemaVersion": "fetch_latest_month.bounded.v2",
-  "updatedUTC": "2026-09-02T11:30:41.849881Z",
+  "updatedUTC": "2026-11-17T00:56:39.520137Z",
   "apply": true,
   "mode": "FILL_MISSING",
   "targetMonths": [
-    "2026-06",
-    "2026-07",
-    "2026-08"
+    "2026-09",
+    "2026-10"
   ],
   "datasets": [
-    "fuelinst",
-    "fuelhh",
     "prices"
   ],
   "plan": [
     {
-      "dataset": "fuelinst",
-      "month": "2026-06",
-      "action": "SKIP_FROZEN",
-      "reason": "Parquet already exists; preserve historical bytes",
-      "partition": "generation/dataset=fuelinst/year=2026/month=6",
-      "existingFiles": [
-        "generation/dataset=fuelinst/year=2026/month=6/data_0.parquet"
-      ],
-      "existingBytes": 406969
-    },
-    {
-      "dataset": "fuelhh",
-      "month": "2026-06",
+      "dataset": "prices",
+      "month": "2026-09",
       "action": "ADD_MISSING",
       "reason": "no Parquet exists for this requested dataset-month",
-      "partition": "generation/dataset=fuelhh/year=2026/month=6",
+      "partition": "prices/year=2026/month=9",
       "existingFiles": [],
       "existingBytes": 0
     },
     {
       "dataset": "prices",
-      "month": "2026-06",
-      "action": "SKIP_FROZEN",
-      "reason": "Parquet already exists; preserve historical bytes",
-      "partition": "prices/year=2026/month=6",
-      "existingFiles": [
-        "prices/year=2026/month=6/data_0.parquet"
-      ],
-      "existingBytes": 15256
-    },
-    {
-      "dataset": "fuelinst",
-      "month": "2026-07",
+      "month": "2026-10",
       "action": "ADD_MISSING",
       "reason": "no Parquet exists for this requested dataset-month",
-      "partition": "generation/dataset=fuelinst/year=2026/month=7",
-      "existingFiles": [],
-      "existingBytes": 0
-    },
-    {
-      "dataset": "fuelhh",
-      "month": "2026-07",
-      "action": "ADD_MISSING",
-      "reason": "no Parquet exists for this requested dataset-month",
-      "partition": "generation/dataset=fuelhh/year=2026/month=7",
-      "existingFiles": [],
-      "existingBytes": 0
-    },
-    {
-      "dataset": "prices",
-      "month": "2026-07",
-      "action": "ADD_MISSING",
-      "reason": "no Parquet exists for this requested dataset-month",
-      "partition": "prices/year=2026/month=7",
-      "existingFiles": [],
-      "existingBytes": 0
-    },
-    {
-      "dataset": "fuelinst",
-      "month": "2026-08",
-      "action": "ADD_MISSING",
-      "reason": "no Parquet exists for this requested dataset-month",
-      "partition": "generation/dataset=fuelinst/year=2026/month=8",
-      "existingFiles": [],
-      "existingBytes": 0
-    },
-    {
-      "dataset": "fuelhh",
-      "month": "2026-08",
-      "action": "ADD_MISSING",
-      "reason": "no Parquet exists for this requested dataset-month",
-      "partition": "generation/dataset=fuelhh/year=2026/month=8",
-      "existingFiles": [],
-      "existingBytes": 0
-    },
-    {
-      "dataset": "prices",
-      "month": "2026-08",
-      "action": "ADD_MISSING",
-      "reason": "no Parquet exists for this requested dataset-month",
-      "partition": "prices/year=2026/month=8",
+      "partition": "prices/year=2026/month=10",
       "existingFiles": [],
       "existingBytes": 0
     }
   ],
   "perMonth": {
-    "2026-06": {
-      "fuelinst": {
-        "action": "SKIP_FROZEN",
-        "rowsFetched": 0,
-        "estimatedApiRequests": 0
-      },
-      "fuelhh": {
-        "action": "ADD_MISSING",
-        "estimatedApiRequests": 5,
-        "rowsFetched": 13824,
-        "rowsKeptInUtcPartition": 12960,
-        "boundaryRowsDiscarded": 864
-      },
-      "prices": {
-        "action": "SKIP_FROZEN",
-        "rowsFetched": 0,
-        "estimatedApiRequests": 0
-      }
-    },
-    "2026-07": {
-      "fuelinst": {
-        "action": "ADD_MISSING",
-        "estimatedApiRequests": 31,
-        "rowsFetched": 178560,
-        "rowsKeptInUtcPartition": 178540,
-        "boundaryRowsDiscarded": 20
-      },
-      "fuelhh": {
-        "action": "ADD_MISSING",
-        "estimatedApiRequests": 5,
-        "rowsFetched": 14256,
-        "rowsKeptInUtcPartition": 13392,
-        "boundaryRowsDiscarded": 864
-      },
+    "2026-09": {
       "prices": {
         "action": "ADD_MISSING",
-        "estimatedApiRequests": 33,
-        "rowsFetched": 1584,
-        "rowsKeptInUtcPartition": 1488,
+        "estimatedApiRequests": 32,
+        "rowsFetched": 1536,
+        "rowsKeptInUtcPartition": 1440,
         "boundaryRowsDiscarded": 96
       }
     },
-    "2026-08": {
-      "fuelinst": {
-        "action": "ADD_MISSING",
-        "estimatedApiRequests": 31,
-        "rowsFetched": 178560,
-        "rowsKeptInUtcPartition": 178540,
-        "boundaryRowsDiscarded": 20
-      },
-      "fuelhh": {
-        "action": "ADD_MISSING",
-        "estimatedApiRequests": 5,
-        "rowsFetched": 14256,
-        "rowsKeptInUtcPartition": 13392,
-        "boundaryRowsDiscarded": 864
-      },
+    "2026-10": {
       "prices": {
         "action": "ADD_MISSING",
         "estimatedApiRequests": 33,
-        "rowsFetched": 1584,
+        "rowsFetched": 1586,
         "rowsKeptInUtcPartition": 1488,
-        "boundaryRowsDiscarded": 96
+        "boundaryRowsDiscarded": 98
       }
     }
   },
@@ -173,11 +56,11 @@
     "maxNewParquetBytes": 134217728,
     "maxApiRequests": 200,
     "maxApiAttempts": 600,
-    "actualDatasetMonthsWritten": 7,
-    "actualRowsFetched": 402624,
-    "actualParquetBytesWritten": 966663,
-    "estimatedApiRequests": 143,
-    "estimatedMaximumApiAttempts": 572
+    "actualDatasetMonthsWritten": 2,
+    "actualRowsFetched": 3122,
+    "actualParquetBytesWritten": 73650,
+    "estimatedApiRequests": 65,
+    "estimatedMaximumApiAttempts": 260
   },
   "historyPolicy": {
     "normal": "existing dataset-month partitions are frozen and skipped",
@@ -199,95 +82,33 @@
   },
   "results": [
     {
-      "dataset": "fuelhh",
+      "dataset": "prices",
       "apply": true,
-      "rowsFetched": 12960,
+      "rowsFetched": 1440,
       "monthsTouched": 1,
       "partitions": [
         {
-          "path": "generation/dataset=fuelhh/year=2026/month=6/data_0.parquet",
+          "path": "prices/year=2026/month=9/data_0.parquet",
           "existingRows": 0,
-          "newRows": 12960,
-          "finalRows": 12960,
+          "newRows": 1440,
+          "finalRows": 1440,
           "duplicatesDropped": 0,
           "droppedNullKeyRows": 0,
           "validation": {
-            "rows": 12960,
-            "distinctKeys": 12960,
+            "rows": 1440,
+            "distinctKeys": 1440,
             "nullKeyRows": 0,
             "duplicateKeyGroups": 0
           },
           "writeMode": "add-missing",
           "readbackValidation": {
-            "rows": 12960,
-            "distinctKeys": 12960,
+            "rows": 1440,
+            "distinctKeys": 1440,
             "nullKeyRows": 0,
             "duplicateKeyGroups": 0
           },
           "staleFilesRemovedAfterVerifiedReplacement": [],
-          "bytes": 43453
-        }
-      ]
-    },
-    {
-      "dataset": "fuelinst",
-      "apply": true,
-      "rowsFetched": 178540,
-      "monthsTouched": 1,
-      "partitions": [
-        {
-          "path": "generation/dataset=fuelinst/year=2026/month=7/data_0.parquet",
-          "existingRows": 0,
-          "newRows": 178540,
-          "finalRows": 178540,
-          "duplicatesDropped": 0,
-          "droppedNullKeyRows": 0,
-          "validation": {
-            "rows": 178540,
-            "distinctKeys": 178540,
-            "nullKeyRows": 0,
-            "duplicateKeyGroups": 0
-          },
-          "writeMode": "add-missing",
-          "readbackValidation": {
-            "rows": 178540,
-            "distinctKeys": 178540,
-            "nullKeyRows": 0,
-            "duplicateKeyGroups": 0
-          },
-          "staleFilesRemovedAfterVerifiedReplacement": [],
-          "bytes": 377385
-        }
-      ]
-    },
-    {
-      "dataset": "fuelhh",
-      "apply": true,
-      "rowsFetched": 13392,
-      "monthsTouched": 1,
-      "partitions": [
-        {
-          "path": "generation/dataset=fuelhh/year=2026/month=7/data_0.parquet",
-          "existingRows": 0,
-          "newRows": 13392,
-          "finalRows": 13392,
-          "duplicatesDropped": 0,
-          "droppedNullKeyRows": 0,
-          "validation": {
-            "rows": 13392,
-            "distinctKeys": 13392,
-            "nullKeyRows": 0,
-            "duplicateKeyGroups": 0
-          },
-          "writeMode": "add-missing",
-          "readbackValidation": {
-            "rows": 13392,
-            "distinctKeys": 13392,
-            "nullKeyRows": 0,
-            "duplicateKeyGroups": 0
-          },
-          "staleFilesRemovedAfterVerifiedReplacement": [],
-          "bytes": 43724
+          "bytes": 36353
         }
       ]
     },
@@ -298,7 +119,7 @@
       "monthsTouched": 1,
       "partitions": [
         {
-          "path": "prices/year=2026/month=7/data_0.parquet",
+          "path": "prices/year=2026/month=10/data_0.parquet",
           "existingRows": 0,
           "newRows": 1488,
           "finalRows": 1488,
@@ -318,117 +139,24 @@
             "duplicateKeyGroups": 0
           },
           "staleFilesRemovedAfterVerifiedReplacement": [],
-          "bytes": 37136
-        }
-      ]
-    },
-    {
-      "dataset": "fuelinst",
-      "apply": true,
-      "rowsFetched": 178540,
-      "monthsTouched": 1,
-      "partitions": [
-        {
-          "path": "generation/dataset=fuelinst/year=2026/month=8/data_0.parquet",
-          "existingRows": 0,
-          "newRows": 178540,
-          "finalRows": 178540,
-          "duplicatesDropped": 0,
-          "droppedNullKeyRows": 0,
-          "validation": {
-            "rows": 178540,
-            "distinctKeys": 178540,
-            "nullKeyRows": 0,
-            "duplicateKeyGroups": 0
-          },
-          "writeMode": "add-missing",
-          "readbackValidation": {
-            "rows": 178540,
-            "distinctKeys": 178540,
-            "nullKeyRows": 0,
-            "duplicateKeyGroups": 0
-          },
-          "staleFilesRemovedAfterVerifiedReplacement": [],
-          "bytes": 383636
-        }
-      ]
-    },
-    {
-      "dataset": "fuelhh",
-      "apply": true,
-      "rowsFetched": 13392,
-      "monthsTouched": 1,
-      "partitions": [
-        {
-          "path": "generation/dataset=fuelhh/year=2026/month=8/data_0.parquet",
-          "existingRows": 0,
-          "newRows": 13392,
-          "finalRows": 13392,
-          "duplicatesDropped": 0,
-          "droppedNullKeyRows": 0,
-          "validation": {
-            "rows": 13392,
-            "distinctKeys": 13392,
-            "nullKeyRows": 0,
-            "duplicateKeyGroups": 0
-          },
-          "writeMode": "add-missing",
-          "readbackValidation": {
-            "rows": 13392,
-            "distinctKeys": 13392,
-            "nullKeyRows": 0,
-            "duplicateKeyGroups": 0
-          },
-          "staleFilesRemovedAfterVerifiedReplacement": [],
-          "bytes": 44507
-        }
-      ]
-    },
-    {
-      "dataset": "prices",
-      "apply": true,
-      "rowsFetched": 1488,
-      "monthsTouched": 1,
-      "partitions": [
-        {
-          "path": "prices/year=2026/month=8/data_0.parquet",
-          "existingRows": 0,
-          "newRows": 1488,
-          "finalRows": 1488,
-          "duplicatesDropped": 0,
-          "droppedNullKeyRows": 0,
-          "validation": {
-            "rows": 1488,
-            "distinctKeys": 1488,
-            "nullKeyRows": 0,
-            "duplicateKeyGroups": 0
-          },
-          "writeMode": "add-missing",
-          "readbackValidation": {
-            "rows": 1488,
-            "distinctKeys": 1488,
-            "nullKeyRows": 0,
-            "duplicateKeyGroups": 0
-          },
-          "staleFilesRemovedAfterVerifiedReplacement": [],
-          "bytes": 36822
+          "bytes": 37297
         }
       ]
     }
   ],
   "parquetAuditBefore": {
-    "parquetFileCount": 456,
-    "parquetTotalMB": 93.407,
-    "generationFuelinstMB": 82.352,
-    "generationFuelhhMB": 7.993,
-    "pricesMB": 3.063
-  },
-  "parquetAuditAfter": {
     "parquetFileCount": 463,
     "parquetTotalMB": 94.329,
     "generationFuelinstMB": 83.077,
     "generationFuelhhMB": 8.118,
     "pricesMB": 3.133
+  },
+  "parquetAuditAfter": {
+    "parquetFileCount": 465,
+    "parquetTotalMB": 94.399,
+    "generationFuelinstMB": 83.077,
+    "generationFuelhhMB": 8.118,
+    "pricesMB": 3.204
   },
   "timeBasis": "Parquet partitions are UTC year/month; GB settlement-date endpoints receive a one-day boundary buffer which is filtered before write",
   "priceRevisionPolicy": "frozen once written; a later correction is an explicit, audited repair"
