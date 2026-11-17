@@ -55,6 +55,27 @@ MIN_PERIODS_PER_DAY = 24
 FIELD = "systemSellPriceGBPperMWh"
 
 
+def price_input_glob(repo):
+    """All supported physical parts; data_1 and later are not duplicate evidence."""
+    return os.path.join(repo, "prices", "year=*", "month=*",
+                        "data_*.parquet").replace("\\", "/")
+
+
+def require_price_grain(connection, parquet_glob):
+    rows, keys, nulls, nonfinite = connection.execute("""
+        SELECT count(*), count(DISTINCT periodStartUTC),
+               count(*) FILTER (WHERE periodStartUTC IS NULL),
+               count(*) FILTER (WHERE systemSellPriceGBPperMWh IS NOT NULL
+                 AND NOT isfinite(systemSellPriceGBPperMWh))
+        FROM read_parquet(?, hive_partitioning=false)
+    """, [parquet_glob]).fetchone()
+    if rows == 0 or rows != keys or nulls or nonfinite:
+        raise ValueError("Price grain failed: rows=%s keys=%s nulls=%s nonfinite=%s"
+                         % (rows, keys, nulls, nonfinite))
+    return {"rows": rows, "distinct_periods": keys,
+            "null_keys": nulls, "nonfinite_sell_prices": nonfinite}
+
+
 def mean(values):
     return sum(values) / len(values) if values else None
 
@@ -99,9 +120,9 @@ def extreme(con, glob, direction):
 def main():
     import duckdb
 
-    glob = os.path.join(REPO, "prices", "year=*", "month=*",
-                        "data_0.parquet").replace("\\", "/")
+    glob = price_input_glob(REPO)
     con = duckdb.connect()
+    input_grain = require_price_grain(con, glob)
 
     periods = con.execute(
         "SELECT count(*) FROM read_parquet(?) WHERE %s IS NOT NULL" % FIELD,
@@ -185,7 +206,9 @@ def main():
         },
         "derived_from": {
             "repository": "Ventusltd/data-gb-electricity",
-            "path": "prices/year=*/month=*/data_0.parquet",
+            "path": "prices/year=*/month=*/data_*.parquet",
+            "source_key": "periodStartUTC",
+            "input_grain": input_grain,
             "field": FIELD,
             "upstream": "Elexon",
             "settlement_periods": periods,
@@ -222,8 +245,9 @@ def main():
 
     out_dir = os.path.join(HERE)
     out = os.path.join(out_dir, "price-decade-rollup.json")
-    io.open(out, "w", encoding="utf-8", newline="\n").write(
-        json.dumps(product, ensure_ascii=False, indent=2) + "\n")
+    with io.open(out, "w", encoding="utf-8", newline="\n") as stream:
+        stream.write(json.dumps(product, ensure_ascii=False, indent=2) + "\n")
+    con.close()
 
     print("wrote derived/price-decade-rollup.json (%.1f kB)"
           % (os.path.getsize(out) / 1024.0))
