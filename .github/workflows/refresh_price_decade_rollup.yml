@@ -41,6 +41,7 @@ on:
     paths:
       - 'derived/**'
       - 'tests/**'
+      - 'pipelines/gb_calendar.py'
       - '.github/workflows/refresh_price_decade_rollup.yml'
 
 permissions:
