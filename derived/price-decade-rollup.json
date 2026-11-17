@@ -13,17 +13,17 @@
     "path": "prices/year=*/month=*/data_*.parquet",
     "source_key": "periodStartUTC",
     "input_grain": {
-      "rows": 186342,
-      "distinct_periods": 186342,
+      "rows": 189270,
+      "distinct_periods": 189270,
       "null_keys": 0,
       "nonfinite_sell_prices": 0
     },
     "field": "systemSellPriceGBPperMWh",
     "upstream": "Elexon",
-    "settlement_periods": 186342,
-    "settlement_periods_on_included_dates": 186340,
-    "included_days": 3883,
-    "complete_days": 3883
+    "settlement_periods": 189270,
+    "settlement_periods_on_included_dates": 189270,
+    "included_days": 3944,
+    "complete_days": 3944
   },
   "solar": {
     "present": false,
@@ -35,8 +35,8 @@
       "2016",
       "2026"
     ],
-    "available_record_daily_mean": 79.02,
-    "decade_mean": 79.02,
+    "available_record_daily_mean": 79.98,
+    "decade_mean": 79.98,
     "lowest_settlement_period": {
       "value": -185.33,
       "date": "2023-07-17",
@@ -49,8 +49,8 @@
       "settlement_period": 33,
       "period_start_utc": "2021-09-09T16:00:00Z"
     },
-    "days_with_a_negative_settlement_period": 719,
-    "negative_period_day_share_pct": 18.52,
+    "days_with_a_negative_settlement_period": 736,
+    "negative_period_day_share_pct": 18.66,
     "by_year": [
       {
         "year": "2016",
@@ -184,16 +184,16 @@
       },
       {
         "year": "2026",
-        "days": 230,
-        "days_included": 230,
+        "days": 291,
+        "days_included": 291,
         "calendar_days": 365,
-        "calendar_date_coverage_pct": 63.01,
+        "calendar_date_coverage_pct": 79.73,
         "calendar_date_coverage": "PARTIAL_DATE_COVERAGE",
-        "mean_gbp_per_mwh": 99.09,
+        "mean_gbp_per_mwh": 108.01,
         "min_daily_mean": -2.08,
-        "max_daily_mean": 178.94,
-        "days_with_a_negative_settlement_period": 57,
-        "negative_period_day_share_pct": 24.78
+        "max_daily_mean": 240.03,
+        "days_with_a_negative_settlement_period": 74,
+        "negative_period_day_share_pct": 25.43
       }
     ]
   }
